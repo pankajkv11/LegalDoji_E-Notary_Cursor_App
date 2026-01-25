@@ -1,0 +1,8 @@
+# PostgreSQL for E-Notary (optional custom image; typically use official postgres)
+FROM postgres:16-alpine
+
+ENV POSTGRES_USER=postgres \
+    POSTGRES_PASSWORD=postgres \
+    POSTGRES_DB=enotary
+
+EXPOSE 5432

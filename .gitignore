@@ -1,0 +1,6 @@
+backend/.venv/*
+node_modules/*
+.next/*
+.DS_Store
+**/pycache/*
+*.md
