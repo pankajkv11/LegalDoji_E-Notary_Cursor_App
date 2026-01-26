@@ -1,0 +1,14 @@
+mutation SubmitNotaryApplication($input: NotaryApplicationInput!) {
+  submitNotaryApplication(input: $input) {
+    id
+    applicationNumber
+    userId
+    firstName
+    middleName
+    lastName
+    email
+    phone
+    status
+    appliedAt
+  }
+}

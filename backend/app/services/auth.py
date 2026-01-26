@@ -43,7 +43,7 @@ class AuthService:
             phone=phone,
             hashed_password=hash_password(password),
             role=UserRole.USER,
-            status=UserStatus.ACTIVE,
+            status=UserStatus.ACTIVE,  # Set to ACTIVE for new signups
             email_verified=False,
             phone_verified=False,
         )

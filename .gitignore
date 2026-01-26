@@ -4,3 +4,18 @@ node_modules/*
 .DS_Store
 **/pycache/*
 *.md
+
+# GraphQL Generated Files
+graphql/generated/*
+!graphql/generated/.gitkeep
+!graphql/generated/README.md
+graphql/schema.json
+graphql/.schema-hash
+
+# Environment
+.env.local
+.env*.local
+
+# Testing
+coverage/
+.nyc_output/

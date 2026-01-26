@@ -1,7 +1,33 @@
+'use client'
+
+import React from 'react'
 import Link from 'next/link'
-import { FileText, Video, Download, CheckCircle, ArrowRight, Play, Truck } from 'lucide-react'
+import { FileText, Video, Download, CheckCircle, ArrowRight, Play, Truck, Loader2 } from 'lucide-react'
+import { useServicesQuery, useFaQsQuery, useDocumentTemplatesQuery } from '@/graphql/generated/hooks'
 
 export default function HowItWorksPage() {
+  const { data: servicesData, loading: servicesLoading } = useServicesQuery()
+  const { data: faqsData } = useFaQsQuery({ variables: { category: undefined } })
+  const { data: templatesData } = useDocumentTemplatesQuery()
+
+  const totalTemplates = templatesData?.documentTemplates?.length || 50
+  
+  // Map GraphQL services to pricing
+  const pricing = React.useMemo(() => {
+    if (!servicesData?.services || servicesData.services.length === 0) {
+      return [
+        { service: 'Document Creation', price: '₹249' },
+        { service: 'Physical Delivery', price: '+₹149' },
+        { service: 'Online Consultation & E-Notarization', price: '₹999' }
+      ]
+    }
+
+    return servicesData.services.map((service) => ({
+      service: service.name,
+      price: service.price
+    }))
+  }, [servicesData])
+
   const steps = [
     {
       number: 1,
@@ -9,7 +35,7 @@ export default function HowItWorksPage() {
       description: 'Fill in your document details and submit the form',
       icon: FileText,
       details: [
-        'Choose from 50+ document templates',
+        `Choose from ${totalTemplates}+ document templates`,
         'Fill the simple guided form with your details',
         'Upload existing documents if you have them',
         'Live preview as you fill the form',
@@ -51,12 +77,6 @@ export default function HowItWorksPage() {
       image: '🎥',
       color: 'bg-gray-900'
     }
-  ]
-
-  const pricing = [
-    { service: 'Document Creation', price: '₹249' },
-    { service: 'Physical Delivery', price: '+₹149' },
-    { service: 'Online Consultation & E-Notarization', price: '₹999' }
   ]
 
   return (

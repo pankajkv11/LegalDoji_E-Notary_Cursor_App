@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Upload, CheckCircle, FileText, User, Mail, Phone, File } from 'lucide-react'
+import { ArrowLeft, Upload, CheckCircle, FileText, User, Mail, Phone, File, Loader2, AlertCircle } from 'lucide-react'
+import { useSubmitNotaryApplicationMutation } from '@/graphql/generated/hooks'
 
 export default function NotaryApplicationPage() {
   const [formData, setFormData] = useState({
@@ -15,7 +16,20 @@ export default function NotaryApplicationPage() {
   })
 
   const [submitted, setSubmitted] = useState(false)
-  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [applicationId, setApplicationId] = useState<string | null>(null)
+
+  const [submitApplication, { loading: uploading }] = useSubmitNotaryApplicationMutation({
+    onCompleted: (data) => {
+      if (data.submitNotaryApplication) {
+        setApplicationId(data.submitNotaryApplication.applicationNumber)
+        setSubmitted(true)
+      }
+    },
+    onError: (err) => {
+      setError(err.message)
+    }
+  })
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -25,13 +39,29 @@ export default function NotaryApplicationPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setUploading(true)
+    setError(null)
 
-    // Simulate upload
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    if (!formData.barCouncilFile) {
+      setError('Please upload your bar council certificate')
+      return
+    }
 
-    setUploading(false)
-    setSubmitted(true)
+    try {
+      await submitApplication({
+        variables: {
+          input: {
+            firstName: formData.firstName,
+            middleName: formData.middleName || undefined,
+            lastName: formData.lastName,
+            email: formData.email,
+            phone: formData.phone,
+            barCouncilFile: formData.barCouncilFile as any // File upload type
+          }
+        }
+      })
+    } catch (err) {
+      // Error handled by onError callback
+    }
   }
 
   if (submitted) {
@@ -63,9 +93,11 @@ export default function NotaryApplicationPage() {
                 </li>
               </ul>
             </div>
-            <p className="text-sm text-gray-600 mb-6">
-              Application ID: <span className="font-mono font-semibold">NOT-{Math.random().toString(36).substr(2, 9).toUpperCase()}</span>
-            </p>
+            {applicationId && (
+              <p className="text-sm text-gray-600 mb-6">
+                Application ID: <span className="font-mono font-semibold">{applicationId}</span>
+              </p>
+            )}
             <div className="flex flex-col sm:flex-row gap-3">
               <Link
                 href="/"

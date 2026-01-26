@@ -31,7 +31,7 @@ class OrderService:
     ) -> Order:
         summary = await self.doc_svc.get_checkout_summary(document_id, user_id, coupon_code)
         doc = await self.doc_repo.get(document_id)
-        if not doc or doc.user_id != user_id:
+        if not doc or str(doc.user_id) != user_id:
             raise ValueError("Document not found")
         order = Order(
             order_number=_order_number(),
@@ -54,11 +54,11 @@ class OrderService:
 
     async def create_payment_intent(self, order_id: str, user_id: str) -> Payment:
         order = await self.repo.get(order_id)
-        if not order or order.user_id != user_id:
+        if not order or str(order.user_id) != user_id:
             raise ValueError("Order not found")
-        from sqlalchemy import select
+        from sqlalchemy import select, cast, String
         existing = await self.session.execute(
-            select(Payment).where(Payment.order_id == order_id)
+            select(Payment).where(cast(Payment.order_id, String) == order_id)
         )
         pay = existing.scalar_one_or_none()
         if pay:
@@ -72,5 +72,5 @@ class OrderService:
         )
         self.session.add(pay)
         await self.session.flush()
-        await self.session.refresh(pay)
+        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return pay

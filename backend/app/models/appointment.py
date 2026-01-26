@@ -37,11 +37,11 @@ class Appointment(Base, TimestampMixin, SoftDeleteMixin):
     meeting_link: Mapped[str | None] = mapped_column(String(512), nullable=True)
     notes: Mapped[str | None] = mapped_column(String(1024), nullable=True)
 
-    user: Mapped["User"] = relationship("User", back_populates="appointments", lazy="joined")
+    user: Mapped["User"] = relationship("User", back_populates="appointments", lazy="noload")
     notary: Mapped["Notary"] = relationship(
-        "Notary", back_populates="appointments", lazy="joined"
+        "Notary", back_populates="appointments", lazy="noload"
     )
-    order: Mapped["Order | None"] = relationship("Order", lazy="joined")
+    order: Mapped["Order | None"] = relationship("Order", lazy="noload")
 
     def __repr__(self) -> str:
         return f"<Appointment {self.id} {self.scheduled_date}>"

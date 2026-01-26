@@ -2,11 +2,16 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { Mail, Phone, User, Lock, Eye, EyeOff, Chrome, CheckCircle } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Mail, Phone, User, Lock, Eye, EyeOff, Chrome, CheckCircle, Loader2, AlertCircle } from 'lucide-react'
+import { useSignupMutation, useSendOtpMutation } from '@/graphql/generated/hooks'
+import { setAuthTokens } from '@/lib/auth'
 
 export default function SignupPage() {
+  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [step, setStep] = useState<'info' | 'otp' | 'password'>('info')
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -17,15 +22,66 @@ export default function SignupPage() {
     acceptTerms: false
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (step === 'info') {
+  const [signup, { loading: signupLoading }] = useSignupMutation({
+    onCompleted: (data) => {
+      if (data.signup) {
+        setAuthTokens(
+          data.signup.accessToken,
+          data.signup.refreshToken,
+          data.signup.user
+        )
+        router.push('/dashboard')
+      }
+    },
+    onError: (err) => {
+      setError(err.message)
+    }
+  })
+
+  const [sendOtp, { loading: otpLoading }] = useSendOtpMutation({
+    onCompleted: () => {
       setStep('otp')
+      setError(null)
+    },
+    onError: (err) => {
+      setError(err.message)
+    }
+  })
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+
+    if (step === 'info') {
+      // Send OTP for verification
+      await sendOtp({
+        variables: {
+          email: formData.email,
+          phone: formData.phone
+        }
+      })
     } else if (step === 'otp') {
+      // Move to password step after OTP verification
       setStep('password')
     } else {
-      // In real app, this would create account
-      window.location.href = '/dashboard'
+      // Final signup with password
+      if (formData.password !== formData.confirmPassword) {
+        setError('Passwords do not match')
+        return
+      }
+
+      await signup({
+        variables: {
+          input: {
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+            password: formData.password,
+            otp: formData.otp || undefined,
+            acceptTerms: formData.acceptTerms
+          }
+        }
+      })
     }
   }
 
@@ -101,6 +157,14 @@ export default function SignupPage() {
                 </div>
               </div>
             </>
+          )}
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2 text-red-700">
+              <AlertCircle className="h-5 w-5 flex-shrink-0" />
+              <span className="text-sm">{error}</span>
+            </div>
           )}
 
           {/* Form */}
@@ -185,9 +249,17 @@ export default function SignupPage() {
 
                 <button
                   type="submit"
-                  className="w-full bg-primary-600 text-white hover:bg-primary-700 py-3 px-4 rounded-lg font-semibold transition-all"
+                  disabled={otpLoading}
+                  className="w-full bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
                 >
-                  Continue
+                  {otpLoading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Sending OTP...
+                    </>
+                  ) : (
+                    'Continue'
+                  )}
                 </button>
               </>
             )}
@@ -221,9 +293,17 @@ export default function SignupPage() {
 
                 <button
                   type="submit"
-                  className="w-full bg-primary-600 text-white hover:bg-primary-700 py-3 px-4 rounded-lg font-semibold transition-all"
+                  disabled={otpLoading}
+                  className="w-full bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
                 >
-                  Verify
+                  {otpLoading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    'Verify'
+                  )}
                 </button>
 
                 <button
@@ -298,9 +378,17 @@ export default function SignupPage() {
 
                 <button
                   type="submit"
-                  className="w-full bg-primary-600 text-white hover:bg-primary-700 py-3 px-4 rounded-lg font-semibold transition-all"
+                  disabled={signupLoading}
+                  className="w-full bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
                 >
-                  Create Account
+                  {signupLoading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    'Create Account'
+                  )}
                 </button>
               </>
             )}

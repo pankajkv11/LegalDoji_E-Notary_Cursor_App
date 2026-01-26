@@ -43,24 +43,24 @@ class Order(Base, TimestampMixin, SoftDeleteMixin):
     total_amount: Mapped[int] = mapped_column(Integer, nullable=False)
     coupon_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
-    user: Mapped["User"] = relationship("User", back_populates="orders", lazy="joined")
+    user: Mapped["User"] = relationship("User", back_populates="orders", lazy="noload")
     document: Mapped["Document | None"] = relationship(
-        "Document", foreign_keys=[document_id], lazy="joined"
+        "Document", foreign_keys=[document_id], lazy="noload"
     )
     delivery_address: Mapped["Address | None"] = relationship(
-        "Address", foreign_keys=[delivery_address_id], lazy="joined"
+        "Address", foreign_keys=[delivery_address_id], lazy="noload"
     )
     payment: Mapped["Payment | None"] = relationship(
-        "Payment", back_populates="order", uselist=False, lazy="joined"
+        "Payment", back_populates="order", uselist=False, lazy="noload"
     )
     delivery: Mapped["Delivery | None"] = relationship(
-        "Delivery", back_populates="order", uselist=False, lazy="joined"
+        "Delivery", back_populates="order", uselist=False, lazy="noload"
     )
     appointment: Mapped["Appointment | None"] = relationship(
         "Appointment",
         primaryjoin="Order.appointment_id == Appointment.id",
         foreign_keys="[Order.appointment_id]",
-        lazy="joined",
+        lazy="noload",
         viewonly=True,
     )
 
@@ -89,7 +89,7 @@ class Payment(Base, TimestampMixin, SoftDeleteMixin):
     razorpay_payment_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    order: Mapped["Order"] = relationship("Order", back_populates="payment", lazy="joined")
+    order: Mapped["Order"] = relationship("Order", back_populates="payment", lazy="noload")
 
     def __repr__(self) -> str:
         return f"<Payment {self.id} {self.status}>"
@@ -114,7 +114,7 @@ class Delivery(Base, TimestampMixin, SoftDeleteMixin):
     expected_delivery: Mapped[date | None] = mapped_column(Date, nullable=True)
     stages: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
 
-    order: Mapped["Order"] = relationship("Order", back_populates="delivery", lazy="joined")
+    order: Mapped["Order"] = relationship("Order", back_populates="delivery", lazy="noload")
 
     def __repr__(self) -> str:
         return f"<Delivery {self.tracking_number}>"

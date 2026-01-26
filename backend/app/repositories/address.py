@@ -1,5 +1,5 @@
 """Address repository."""
-from sqlalchemy import select
+from sqlalchemy import select, cast, String
 
 from app.models.address import Address
 from app.repositories.base import BaseRepository
@@ -11,7 +11,7 @@ class AddressRepository(BaseRepository[Address]):
 
     async def get_by_user(self, user_id: str):
         q = select(Address).where(
-            Address.user_id == user_id,
+            cast(Address.user_id, String) == user_id,
             Address.deleted_at.is_(None),
         )
         result = await self.session.execute(q)

@@ -2,83 +2,57 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { FileText, Video, ChevronRight, CheckCircle, ArrowRight } from 'lucide-react'
+import { FileText, Video, ChevronRight, CheckCircle, ArrowRight, Loader2 } from 'lucide-react'
+import { useServicesQuery } from '@/graphql/generated/hooks'
 
 export default function ServicesPage() {
-  const services = [
-    {
-      id: 'physical-delivery',
-      name: 'Physical Delivery',
-      icon: FileText,
-      price: '₹398',
-      basePrice: '₹249',
-      deliveryFee: '₹149',
+  const { data, loading, error } = useServicesQuery()
+
+  // Map GraphQL services to component format
+  const services = React.useMemo(() => {
+    if (!data?.services) return []
+    
+    return data.services.map((service) => ({
+      id: service.id,
+      name: service.name,
+      icon: service.name.toLowerCase().includes('video') || service.name.toLowerCase().includes('consultation') ? Video : FileText,
+      price: service.price,
+      basePrice: service.basePrice ? `₹${service.basePrice}` : null,
+      deliveryFee: service.deliveryFee ? `₹${service.deliveryFee}` : null,
       discount: null,
-      description: 'Create legal documents with physical delivery to your doorstep',
-      flow: [
-        'Create your document online',
-        'Review and checkout',
-        'Complete secure payment',
-        'Receive offline delivery (3-5 days)'
-      ],
-      features: [
-        'Rental Agreements',
-        'Affidavits',
-        'Power of Attorney',
-        'Sale Deed',
-        'Will / Testament',
-        'NOC & Other Documents'
-      ],
-      includes: [
-        'Professional legal templates',
-        'Digital document creation',
-        'PDF download',
-        'Physical delivery via courier',
-        'Legal validity across India',
-        'Email & chat support'
-      ],
-      popular: true,
-      color: 'bg-gray-800',
-      cta: 'Create Document'
-    },
-    {
-      id: 'video-consultation',
-      name: 'Video Consultation',
-      icon: Video,
-      price: '₹999',
-      basePrice: null,
-      deliveryFee: null,
-      discount: null,
-      description: 'Live video consultation with verified notary + E-notarization + Physical delivery',
-      flow: [
-        'Schedule appointment online',
-        'Video consultation with notary',
-        'Get document e-notarized',
-        'Receive physical delivery (included)'
-      ],
-      features: [
-        'Live video call with notary',
-        'Professional legal consultation',
-        'Document review & verification',
-        'Digital signature & seal',
-        'Identity verification',
-        'Session recording for records'
-      ],
-      includes: [
-        'Verified notary session',
-        'E-notarization with digital seal',
-        'Physical delivery included',
-        'Court-accepted documents',
-        'Calendar appointment booking',
-        'Email confirmation & reminders',
-        'Priority support',
-        'Legally binding across India'
-      ],
-      popular: false,
-      color: 'bg-gray-900',
-      cta: 'Schedule Video Consultation'
-    }
-  ]
+      description: service.description,
+      flow: service.flow || [],
+      features: service.features || [],
+      includes: service.includes || [],
+      popular: service.popular || false,
+      color: service.popular ? 'bg-gray-800' : 'bg-gray-900',
+      cta: service.name.toLowerCase().includes('video') || service.name.toLowerCase().includes('consultation') 
+        ? 'Schedule Video Consultation' 
+        : 'Create Document'
+    }))
+  }, [data])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-gray-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading services...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Error loading services: {error.message}</p>
+          <Link href="/" className="text-primary-600 hover:underline">Go back home</Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

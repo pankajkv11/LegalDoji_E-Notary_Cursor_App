@@ -35,7 +35,7 @@ class DocumentService:
                 if current_step is not None:
                     existing.current_step = current_step
                 await self.session.flush()
-                await self.session.refresh(existing)
+                # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
                 return existing
         doc = Document(
             user_id=user_id,

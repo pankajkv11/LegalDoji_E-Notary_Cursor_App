@@ -13,3 +13,4 @@ python-multipart>=0.0.6
 starlette-admin>=0.16
 aiosqlite>=0.19
 greenlet>=3.0
+argon2_cffi

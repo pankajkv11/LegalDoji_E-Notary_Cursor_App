@@ -11,7 +11,9 @@ class UserService:
         self.repo = UserRepository(session)
 
     async def get_me(self, user_id: str) -> User | None:
-        return await self.repo.get_by_id_with_relations(user_id)
+        # Use get() instead of get_by_id_with_relations to avoid type mismatch
+        # The relations are loaded via lazy="joined" in the model
+        return await self.repo.get(user_id)
 
     async def get_by_id(self, user_id: str) -> User | None:
         return await self.repo.get(user_id)

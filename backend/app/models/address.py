@@ -28,7 +28,7 @@ class Address(Base, TimestampMixin, SoftDeleteMixin):
     country: Mapped[str] = mapped_column(String(128), nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    user: Mapped["User"] = relationship("User", back_populates="addresses", lazy="joined")
+    user: Mapped["User"] = relationship("User", back_populates="addresses", lazy="noload")
 
     def __repr__(self) -> str:
         return f"<Address {self.id} {self.city}>"

@@ -1,0 +1,80 @@
+mutation Signup($input: SignupInput!) {
+  signup(input: $input) {
+    accessToken
+    refreshToken
+    expiresIn
+    user {
+      id
+      name
+      email
+      phone
+      role
+      status
+      emailVerified
+      phoneVerified
+      permissions
+    }
+  }
+}
+
+mutation Login($input: LoginInput!) {
+  login(input: $input) {
+    accessToken
+    refreshToken
+    expiresIn
+    user {
+      id
+      name
+      email
+      phone
+      role
+      status
+      emailVerified
+      phoneVerified
+      permissions
+    }
+  }
+}
+
+mutation RefreshToken($input: RefreshTokenInput!) {
+  refreshToken(input: $input) {
+    accessToken
+    refreshToken
+    expiresIn
+    user {
+      id
+      name
+      email
+      phone
+      role
+      status
+    }
+  }
+}
+
+mutation Logout {
+  logout
+}
+
+mutation SendOtp($email: String, $phone: String) {
+  sendOtp(email: $email, phone: $phone) {
+    success
+    message
+    expiresIn
+  }
+}
+
+mutation ForgotPassword($input: ForgotPasswordInput!) {
+  forgotPassword(input: $input) {
+    success
+    message
+  }
+}
+
+mutation ResetPassword($input: ResetPasswordInput!) {
+  resetPassword(input: $input)
+}
+
+mutation ChangePassword($input: ChangePasswordInput!) {
+  changePassword(input: $input)
+}

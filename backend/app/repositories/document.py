@@ -1,5 +1,5 @@
 """Document and DocumentTemplate repositories."""
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func, cast, String
 
 from app.models.document import Document, DocumentTemplate
 from app.models.enums import DocumentStatus, DocumentCategory
@@ -19,7 +19,7 @@ class DocumentRepository(BaseRepository[Document]):
         offset: int = 0,
     ):
         q = select(Document).where(
-            Document.user_id == user_id,
+            cast(Document.user_id, String) == user_id,
             Document.deleted_at.is_(None),
         )
         if status is not None:
@@ -29,9 +29,8 @@ class DocumentRepository(BaseRepository[Document]):
         return list(result.scalars().all())
 
     async def count_by_user(self, user_id: str, status: DocumentStatus | None = None) -> int:
-        from sqlalchemy import func
         q = select(func.count()).select_from(Document).where(
-            Document.user_id == user_id,
+            cast(Document.user_id, String) == user_id,
             Document.deleted_at.is_(None),
         )
         if status is not None:

@@ -1,0 +1,45 @@
+query Notary($id: String!) {
+  notary(id: $id) {
+    id
+    userId
+    fullName
+    email
+    phone
+    photoUrl
+    licenseNumber
+    barCouncilNumber
+    barCouncilState
+    enrollmentDate
+    experience
+    specialization
+    languages
+    location
+    consultationFee
+    rating
+    reviewsCount
+    completedSessions
+    bio
+    isVerified
+    verificationDate
+    createdAt
+    updatedAt
+  }
+}
+
+query Notaries($specialization: String, $location: String) {
+  notaries(specialization: $specialization, location: $location) {
+    id
+    userId
+    fullName
+    email
+    phone
+    photoUrl
+    specialization
+    location
+    consultationFee
+    rating
+    reviewsCount
+    isVerified
+    createdAt
+  }
+}

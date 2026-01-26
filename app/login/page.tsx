@@ -3,7 +3,9 @@
 import React, { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Mail, Phone, Lock, Eye, EyeOff, Chrome } from 'lucide-react'
+import { Mail, Phone, Lock, Eye, EyeOff, Chrome, Loader2, AlertCircle } from 'lucide-react'
+import { useLoginMutation, useSendOtpMutation } from '@/graphql/generated/hooks'
+import { setAuthTokens } from '@/lib/auth'
 
 function LoginForm() {
   const router = useRouter()
@@ -12,6 +14,7 @@ function LoginForm() {
   const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email')
   const [showPassword, setShowPassword] = useState(false)
   const [step, setStep] = useState<'credentials' | 'otp'>('credentials')
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     email: '',
     phone: '',
@@ -19,13 +22,71 @@ function LoginForm() {
     otp: ''
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (step === 'credentials') {
+  const [login, { loading: loginLoading }] = useLoginMutation({
+    onCompleted: (data) => {
+      if (data.login) {
+        setAuthTokens(
+          data.login.accessToken,
+          data.login.refreshToken,
+          data.login.user
+        )
+        const target = redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`
+        router.push(target)
+      }
+    },
+    onError: (err) => {
+      setError(err.message)
+    }
+  })
+
+  const [sendOtp, { loading: otpLoading }] = useSendOtpMutation({
+    onCompleted: () => {
       setStep('otp')
+      setError(null)
+    },
+    onError: (err) => {
+      setError(err.message)
+    }
+  })
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+
+    if (step === 'credentials') {
+      if (loginMethod === 'email' && formData.email && formData.password) {
+        // Direct login with email/password
+        await login({
+          variables: {
+            input: {
+              method: 'EMAIL',
+              email: formData.email,
+              password: formData.password
+            }
+          }
+        })
+      } else if (loginMethod === 'phone' && formData.phone) {
+        // Send OTP for phone login
+        await sendOtp({
+          variables: {
+            phone: formData.phone
+          }
+        })
+      }
     } else {
-      const target = redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`
-      router.push(target)
+      // OTP verification
+      if (formData.otp) {
+        await login({
+          variables: {
+            input: {
+              method: loginMethod === 'email' ? 'EMAIL' : 'PHONE',
+              email: loginMethod === 'email' ? formData.email : undefined,
+              phone: loginMethod === 'phone' ? formData.phone : undefined,
+              otp: formData.otp
+            }
+          }
+        })
+      }
     }
   }
 
@@ -92,6 +153,14 @@ function LoginForm() {
               Phone
             </button>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2 text-red-700">
+              <AlertCircle className="h-5 w-5 flex-shrink-0" />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -174,9 +243,17 @@ function LoginForm() {
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  className="w-full bg-primary-600 text-white hover:bg-primary-700 py-3 px-4 rounded-lg font-semibold transition-all"
+                  disabled={loginLoading || otpLoading}
+                  className="w-full bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
                 >
-                  Send OTP
+                  {loginLoading || otpLoading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      {loginMethod === 'email' ? 'Logging in...' : 'Sending OTP...'}
+                    </>
+                  ) : (
+                    loginMethod === 'email' ? 'Login' : 'Send OTP'
+                  )}
                 </button>
               </>
             ) : (
@@ -211,9 +288,17 @@ function LoginForm() {
                 {/* Verify Button */}
                 <button
                   type="submit"
-                  className="w-full bg-primary-600 text-white hover:bg-primary-700 py-3 px-4 rounded-lg font-semibold transition-all"
+                  disabled={loginLoading}
+                  className="w-full bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
                 >
-                  Verify & Login
+                  {loginLoading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    'Verify & Login'
+                  )}
                 </button>
 
                 {/* Back Button */}

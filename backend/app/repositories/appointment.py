@@ -1,6 +1,6 @@
 """Appointment repository."""
 from datetime import date
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, cast, String
 
 from app.models.appointment import Appointment
 from app.models.enums import AppointmentStatus
@@ -13,7 +13,7 @@ class AppointmentRepository(BaseRepository[Appointment]):
 
     async def get_by_user(self, user_id: str, status: AppointmentStatus | None = None):
         q = select(Appointment).where(
-            Appointment.user_id == user_id,
+            cast(Appointment.user_id, String) == user_id,
             Appointment.deleted_at.is_(None),
         )
         if status is not None:
@@ -23,7 +23,7 @@ class AppointmentRepository(BaseRepository[Appointment]):
 
     async def get_by_notary(self, notary_id: str, status: AppointmentStatus | None = None):
         q = select(Appointment).where(
-            Appointment.notary_id == notary_id,
+            cast(Appointment.notary_id, String) == notary_id,
             Appointment.deleted_at.is_(None),
         )
         if status is not None:
@@ -39,7 +39,7 @@ class AppointmentRepository(BaseRepository[Appointment]):
     ):
         """Return booked slots in range for conflict checking."""
         q = select(Appointment).where(
-            Appointment.notary_id == notary_id,
+            cast(Appointment.notary_id, String) == notary_id,
             Appointment.deleted_at.is_(None),
             Appointment.status.in_([AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED]),
             Appointment.scheduled_date >= start_date,

@@ -1,0 +1,87 @@
+query Document($id: String!) {
+  document(id: $id) {
+    id
+    userId
+    notaryId
+    orderId
+    templateId
+    title
+    category
+    status
+    formData
+    completionPercentage
+    currentStep
+    pdfUrl
+    createdAt
+    updatedAt
+  }
+}
+
+query MyDocuments($filter: DocumentsFilterInput) {
+  myDocuments(filter: $filter) {
+    nodes {
+      id
+      userId
+      templateId
+      title
+      category
+      status
+      completionPercentage
+      currentStep
+      createdAt
+      updatedAt
+    }
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      totalCount
+    }
+  }
+}
+
+query DocumentTemplates($category: String) {
+  documentTemplates(category: $category) {
+    id
+    slug
+    name
+    category
+    steps {
+      id
+      title
+      fields
+    }
+    defaultValues
+    fieldConfigs
+    createdAt
+    updatedAt
+  }
+}
+
+query DocumentTemplate($slug: String!) {
+  documentTemplate(slug: $slug) {
+    id
+    slug
+    name
+    category
+    steps {
+      id
+      title
+      fields
+    }
+    defaultValues
+    fieldConfigs
+    createdAt
+    updatedAt
+  }
+}
+
+query CheckoutSummary($documentId: String!, $couponCode: String) {
+  checkoutSummary(documentId: $documentId, couponCode: $couponCode) {
+    basePrice
+    deliveryFee
+    subtotal
+    discount
+    total
+    couponApplied
+  }
+}

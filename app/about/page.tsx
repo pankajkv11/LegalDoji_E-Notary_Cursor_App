@@ -1,13 +1,29 @@
+'use client'
+
+import React from 'react'
 import Link from 'next/link'
-import { Target, Eye, Users, MapPin, Award, TrendingUp, CheckCircle } from 'lucide-react'
+import { Target, Eye, Users, MapPin, Award, TrendingUp, CheckCircle, Loader2 } from 'lucide-react'
+import { useFaQsQuery, useServicesQuery, useDocumentTemplatesQuery } from '@/graphql/generated/hooks'
 
 export default function AboutPage() {
-  const stats = [
-    { value: '50,000+', label: 'Documents Created', icon: CheckCircle },
-    { value: '500+', label: 'Verified Notaries', icon: Users },
-    { value: '28', label: 'States Covered', icon: MapPin },
-    { value: '99.9%', label: 'Customer Satisfaction', icon: Award }
-  ]
+  const { data: faqsData } = useFaQsQuery({ variables: { category: undefined } })
+  const { data: servicesData } = useServicesQuery()
+  const { data: templatesData } = useDocumentTemplatesQuery()
+
+  // Calculate stats from GraphQL data
+  const stats = React.useMemo(() => {
+    const totalDocs = templatesData?.documentTemplates?.length || 0
+    const totalNotaries = 500 // Could be fetched from notaries query if needed
+    const states = 28
+    const satisfaction = '99.9%'
+
+    return [
+      { value: `${totalDocs > 0 ? totalDocs : '50'}+`, label: 'Document Templates', icon: CheckCircle },
+      { value: `${totalNotaries}+`, label: 'Verified Notaries', icon: Users },
+      { value: `${states}`, label: 'States Covered', icon: MapPin },
+      { value: satisfaction, label: 'Customer Satisfaction', icon: Award }
+    ]
+  }, [templatesData])
 
   const whyChooseUs = [
     {

@@ -3,7 +3,7 @@ from datetime import date, datetime, timezone
 from typing import Optional, List
 
 import strawberry
-from sqlalchemy import select
+from sqlalchemy import select, cast, String
 
 from app.graphql.context import Context
 from app.graphql.types import (
@@ -77,13 +77,21 @@ class Mutation:
     async def signup(self, info: strawberry.types.Info, input: SignupInput) -> AuthPayloadType:
         ctx: Context = info.context
         svc = AuthService(ctx.session)
-        user, access, refresh, expires = await svc.signup(
-            name=input.name,
-            email=input.email,
-            phone=input.phone,
-            password=input.password,
-            accept_terms=input.accept_terms,
-        )
+        try:
+            user, access, refresh, expires = await svc.signup(
+                name=input.name,
+                email=input.email,
+                phone=input.phone,
+                password=input.password,
+                accept_terms=input.accept_terms,
+            )
+        except ValueError as e:
+            # Re-raise ValueError with clear message
+            raise ValueError(str(e))
+        except Exception as e:
+            # Wrap other exceptions in ValueError for consistent error handling
+            raise ValueError(f"Signup failed: {str(e)}")
+        
         usvc = UserService(ctx.session)
         perms = usvc.permissions_for_user(user)
         return AuthPayloadType(
@@ -96,22 +104,29 @@ class Mutation:
     @strawberry.mutation
     async def login(self, info: strawberry.types.Info, input: LoginInput) -> Optional[AuthPayloadType]:
         ctx: Context = info.context
-        svc = AuthService(ctx.session)
-        if input.method == "EMAIL" and input.email and input.password:
-            out = await svc.login_email_password(input.email, input.password)
-        else:
-            return None
-        if not out:
-            return None
-        user, access, refresh, expires = out
-        usvc = UserService(ctx.session)
-        perms = usvc.permissions_for_user(user)
-        return AuthPayloadType(
-            access_token=access,
-            refresh_token=refresh,
-            expires_in=expires,
-            user=user_to_gql(user, perms),
-        )
+        try:
+            svc = AuthService(ctx.session)
+            if input.method == "EMAIL" and input.email and input.password:
+                out = await svc.login_email_password(input.email, input.password)
+            else:
+                return None
+            if not out:
+                return None
+            user, access, refresh, expires = out
+            usvc = UserService(ctx.session)
+            perms = usvc.permissions_for_user(user)
+            return AuthPayloadType(
+                access_token=access,
+                refresh_token=refresh,
+                expires_in=expires,
+                user=user_to_gql(user, perms),
+            )
+        except ValueError as e:
+            # Re-raise ValueError with clear message
+            raise ValueError(str(e))
+        except Exception as e:
+            # Wrap other exceptions in ValueError for consistent error handling
+            raise ValueError(f"Login failed: {str(e)}")
 
     @strawberry.mutation
     async def refresh_token(self, info: strawberry.types.Info, input: RefreshTokenInput) -> Optional[AuthPayloadType]:
@@ -239,7 +254,7 @@ class Mutation:
         user = ctx.require_user()
         from app.models.notary import Notary
         from sqlalchemy import select
-        n = await ctx.session.execute(select(Notary).where(Notary.id == input.notary_id, Notary.deleted_at.is_(None)))
+        n = await ctx.session.execute(select(Notary).where(cast(Notary.id, String) == input.notary_id, Notary.deleted_at.is_(None)))
         notary = n.scalar_one_or_none()
         if not notary:
             raise ValueError("Notary not found")
@@ -256,7 +271,7 @@ class Mutation:
         )
         ctx.session.add(apt)
         await ctx.session.flush()
-        await ctx.session.refresh(apt)
+        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return appointment_to_gql(apt)
 
     @strawberry.mutation
@@ -280,7 +295,7 @@ class Mutation:
         )
         ctx.session.add(addr)
         await ctx.session.flush()
-        await ctx.session.refresh(addr)
+        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return address_to_gql(addr)
 
     @strawberry.mutation
@@ -312,7 +327,7 @@ class Mutation:
         if input.is_default is not None:
             a.is_default = input.is_default
         await ctx.session.flush()
-        await ctx.session.refresh(a)
+        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return address_to_gql(a)
 
     @strawberry.mutation
@@ -392,7 +407,7 @@ class Mutation:
         )
         ctx.session.add(app)
         await ctx.session.flush()
-        await ctx.session.refresh(app        )
+        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return NotaryApplicationType(
             id=app.id,
             application_number=app.application_number,
@@ -425,10 +440,13 @@ class Mutation:
         ctx: Context = info.context
         user = ctx.require_user()
         from app.models.order import Payment
-        o = await ctx.session.get(Order, order_id)
-        if not o or o.user_id != user.id:
+        # Use select with cast for type safety
+        from app.models.order import Order
+        o_result = await ctx.session.execute(select(Order).where(cast(Order.id, String) == order_id))
+        o = o_result.scalar_one_or_none()
+        if not o or cast(Order.user_id, String) != str(user.id):
             raise ValueError("Order not found")
-        r = await ctx.session.execute(select(Payment).where(Payment.order_id == order_id))
+        r = await ctx.session.execute(select(Payment).where(cast(Payment.order_id, String) == order_id))
         pay = r.scalar_one_or_none()
         if not pay:
             raise ValueError("Payment not found")
@@ -436,7 +454,7 @@ class Mutation:
         pay.status = PaymentStatus.COMPLETED
         pay.paid_at = datetime.now(timezone.utc)
         await ctx.session.flush()
-        await ctx.session.refresh(pay)
+        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return payment_to_gql(pay)
 
     @strawberry.mutation
@@ -444,19 +462,19 @@ class Mutation:
         ctx: Context = info.context
         user = ctx.require_user()
         from app.models.notary import Notary
-        nr = await ctx.session.execute(select(Notary).where(Notary.user_id == user.id))
+        nr = await ctx.session.execute(select(Notary).where(cast(Notary.user_id, String) == str(user.id)))
         notary = nr.scalar_one_or_none()
         if not notary:
             raise ValueError("Notary profile not found")
         r = await ctx.session.execute(
-            select(Appointment).where(Appointment.id == appointment_id, Appointment.deleted_at.is_(None))
+            select(Appointment).where(cast(Appointment.id, String) == appointment_id, Appointment.deleted_at.is_(None))
         )
         apt = r.scalar_one_or_none()
         if not apt or apt.notary_id != notary.id:
             raise ValueError("Appointment not found")
         apt.status = AppointmentStatus.CONFIRMED
         await ctx.session.flush()
-        await ctx.session.refresh(apt)
+        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return appointment_to_gql(apt)
 
     @strawberry.mutation
@@ -469,12 +487,12 @@ class Mutation:
         ctx: Context = info.context
         user = ctx.require_user()
         from app.models.notary import Notary
-        nr = await ctx.session.execute(select(Notary).where(Notary.user_id == user.id))
+        nr = await ctx.session.execute(select(Notary).where(cast(Notary.user_id, String) == str(user.id)))
         notary = nr.scalar_one_or_none()
         if not notary:
             raise ValueError("Notary profile not found")
         r = await ctx.session.execute(
-            select(Appointment).where(Appointment.id == appointment_id, Appointment.deleted_at.is_(None))
+            select(Appointment).where(cast(Appointment.id, String) == appointment_id, Appointment.deleted_at.is_(None))
         )
         apt = r.scalar_one_or_none()
         if not apt or apt.notary_id != notary.id:
@@ -483,7 +501,7 @@ class Mutation:
         if reason:
             apt.notes = (apt.notes or "") + f"\nRejected: {reason}"
         await ctx.session.flush()
-        await ctx.session.refresh(apt)
+        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return appointment_to_gql(apt)
 
     @strawberry.mutation
@@ -491,14 +509,14 @@ class Mutation:
         ctx: Context = info.context
         user = ctx.require_user()
         r = await ctx.session.execute(
-            select(Appointment).where(Appointment.id == appointment_id, Appointment.deleted_at.is_(None))
+            select(Appointment).where(cast(Appointment.id, String) == appointment_id, Appointment.deleted_at.is_(None))
         )
         apt = r.scalar_one_or_none()
         if not apt or apt.user_id != user.id:
             raise ValueError("Appointment not found")
         apt.status = AppointmentStatus.CANCELLED
         await ctx.session.flush()
-        await ctx.session.refresh(apt)
+        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return appointment_to_gql(apt)
 
     @strawberry.mutation
@@ -528,7 +546,7 @@ class Mutation:
             avail.break_start = input.break_start
             avail.break_end = input.break_end
         await ctx.session.flush()
-        await ctx.session.refresh(avail)
+        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return NotaryAvailabilityType(days=avail.days, break_start=avail.break_start, break_end=avail.break_end)
 
     @strawberry.mutation
@@ -563,7 +581,7 @@ class Mutation:
         if input.branch_name is not None:
             n.bank_branch = input.branch_name
         await ctx.session.flush()
-        await ctx.session.refresh(n)
+        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return notary_to_gql(n)
 
     @strawberry.mutation
@@ -579,7 +597,7 @@ class Mutation:
         )
         ctx.session.add(c)
         await ctx.session.flush()
-        await ctx.session.refresh(c)
+        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return contact_to_gql(c)
 
     @strawberry.mutation
@@ -597,7 +615,7 @@ class Mutation:
         r = Review(user_id=user.id, notary_id=notary_id, session_id=session_id, rating=rating, comment=comment)
         ctx.session.add(r)
         await ctx.session.flush()
-        await ctx.session.refresh(r)
+        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return ReviewType(
             id=r.id,
             user_id=r.user_id,
@@ -622,7 +640,7 @@ class Mutation:
             raise PermissionError("Admin only")
         from app.models.notary import NotaryApplication
         r = await ctx.session.execute(
-            select(NotaryApplication).where(NotaryApplication.id == application_id)
+            select(NotaryApplication).where(cast(NotaryApplication.id, String) == application_id)
         )
         app = r.scalar_one_or_none()
         if not app:
@@ -630,7 +648,7 @@ class Mutation:
         app.status = NotaryApplicationStatus.APPROVED
         app.reviewed_at = datetime.now(timezone.utc)
         await ctx.session.flush()
-        await ctx.session.refresh(app)
+        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return NotaryApplicationType(
             id=app.id,
             application_number=app.application_number,
@@ -665,7 +683,7 @@ class Mutation:
         if user.role.value != "ADMIN":
             raise PermissionError("Admin only")
         r = await ctx.session.execute(
-            select(NotaryApplication).where(NotaryApplication.id == application_id)
+            select(NotaryApplication).where(cast(NotaryApplication.id, String) == application_id)
         )
         app = r.scalar_one_or_none()
         if not app:
@@ -675,7 +693,7 @@ class Mutation:
         if reason:
             app.documents = {**(app.documents or {}), "reject_reason": reason}
         await ctx.session.flush()
-        await ctx.session.refresh(app)
+        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return NotaryApplicationType(
             id=app.id,
             application_number=app.application_number,

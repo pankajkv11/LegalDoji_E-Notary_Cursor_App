@@ -1,12 +1,13 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Search, ChevronRight, MessageCircle, Mail } from 'lucide-react'
+import { Search, ChevronRight, MessageCircle, Mail, Loader2 } from 'lucide-react'
+import { useFaQsQuery } from '@/graphql/generated/hooks'
 
 export default function FAQPage() {
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
 
   const categories = [
     { id: 'all', name: 'All Questions' },
@@ -18,140 +19,55 @@ export default function FAQPage() {
     { id: 'account', name: 'Account & Security' }
   ]
 
-  const faqs = [
-    {
-      category: 'general',
-      question: 'What is LegalDoji?',
-      answer: 'LegalDoji is India\'s leading e-notary platform that allows you to create, notarize, and manage legal documents online. We connect you with verified notaries via video call for instant notarization services.'
-    },
-    {
-      category: 'general',
-      question: 'Are the documents legally valid?',
-      answer: 'Yes, absolutely! All documents notarized through our platform are court-accepted and legally binding across India. Our notaries are registered, verified, and authorized to provide notarization services.'
-    },
-    {
-      category: 'general',
-      question: 'Which states do you cover?',
-      answer: 'We have pan-India coverage with verified notaries available in all major cities across 28 states and UTs. You can use our services from anywhere in India.'
-    },
-    {
-      category: 'documents',
-      question: 'What types of documents can I create?',
-      answer: 'We offer 50+ document templates including rental agreements, affidavits, power of attorney, wills, NDAs, employment contracts, partnership deeds, and more. You can also upload your own documents for notarization.'
-    },
-    {
-      category: 'documents',
-      question: 'Can I upload my own document instead of using a template?',
-      answer: 'Yes! You can upload existing documents in PDF or Word format. Our notaries will review and notarize them during the video session.'
-    },
-    {
-      category: 'documents',
-      question: 'How long does it take to create a document?',
-      answer: 'Document creation typically takes 5-10 minutes. Our guided forms make it easy to fill in all required information. Your progress is auto-saved, so you can return anytime.'
-    },
-    {
-      category: 'documents',
-      question: 'Can I edit a document after creating it?',
-      answer: 'Yes, you can edit saved drafts anytime before finalizing. Once a document is notarized, you\'ll need to create a new document with any changes.'
-    },
-    {
-      category: 'notarization',
-      question: 'How does video notarization work?',
-      answer: 'You join a secure video call with a verified notary, show your ID for verification, review the document together, and the notary digitally signs it. The entire session is recorded for legal validity.'
-    },
-    {
-      category: 'notarization',
-      question: 'How long does notarization take?',
-      answer: 'A typical notarization session takes 15-30 minutes. You can choose instant notarization (usually within 2 hours) or schedule an appointment for later.'
-    },
-    {
-      category: 'notarization',
-      question: 'What do I need for video notarization?',
-      answer: 'You need: 1) A valid government ID (Aadhaar, PAN, Passport, or Driver\'s License), 2) Good internet connection, 3) A device with camera and microphone, 4) A quiet, well-lit place for the video call.'
-    },
-    {
-      category: 'notarization',
-      question: 'Can I schedule notarization for a specific time?',
-      answer: 'Yes! You can either opt for instant notarization or schedule an appointment. Our notaries are available Monday to Saturday, 9 AM to 7 PM.'
-    },
-    {
-      category: 'notarization',
-      question: 'What if the notary rejects my document?',
-      answer: 'If a notary cannot notarize your document due to legal issues or missing information, you\'ll receive a full refund. We\'ll also provide guidance on how to fix the issues.'
-    },
-    {
-      category: 'pricing',
-      question: 'How much does it cost?',
-      answer: 'Document Creation: ₹249 (includes template and digital document). Video Notarization: ₹999 (includes online consultation with notary). Physical Delivery: +₹149. E-stamp charges are additional and vary by state.'
-    },
-    {
-      category: 'pricing',
-      question: 'What payment methods do you accept?',
-      answer: 'We accept all major payment methods through Razorpay: Credit/Debit cards, UPI, Net Banking, Wallets (Paytm, PhonePe, etc.). All payments are secure and encrypted.'
-    },
-    {
-      category: 'pricing',
-      question: 'Do you offer refunds?',
-      answer: 'Yes. Full refund if: 1) Document creation fails on our end, 2) Notarization cannot be completed due to technical issues from our side, 3) You cancel before the notarization session. No refund after successful notarization.'
-    },
-    {
-      category: 'pricing',
-      question: 'Are there any hidden charges?',
-      answer: 'No! Our pricing is completely transparent. What you see during checkout is what you pay. E-stamp duty (if applicable) is calculated based on your state and shown before payment.'
-    },
-    {
-      category: 'pricing',
-      question: 'Do you offer bulk discounts?',
-      answer: 'Yes! For 10+ documents, please contact our sales team at support@legaldoji.com for custom pricing. We offer special rates for businesses and organizations.'
-    },
-    {
-      category: 'delivery',
-      question: 'How do I get my document after notarization?',
-      answer: 'You can download your notarized document immediately as a PDF. If you opted for physical delivery (+₹149), we\'ll print and courier it to your address within 3-5 business days.'
-    },
-    {
-      category: 'delivery',
-      question: 'Can I track my physical delivery?',
-      answer: 'Yes! Once your document is shipped, you\'ll receive a tracking number via email and SMS. You can track the delivery status in real-time from your dashboard.'
-    },
-    {
-      category: 'delivery',
-      question: 'What if I need additional physical copies?',
-      answer: 'You can order additional copies anytime from your dashboard. Additional copies cost ₹79 each + delivery charges.'
-    },
-    {
-      category: 'account',
-      question: 'Do I need an account to use LegalDoji?',
-      answer: 'You can browse templates without an account, but you\'ll need to create one to complete document creation and payment. It\'s quick and free!'
-    },
-    {
-      category: 'account',
-      question: 'Is my personal information secure?',
-      answer: 'Absolutely! We use bank-grade 256-bit SSL encryption for all data. Your documents and personal information are stored securely and never shared with third parties.'
-    },
-    {
-      category: 'account',
-      question: 'What is KYC and why is it required?',
-      answer: 'KYC (Know Your Customer) verification helps us confirm your identity for notarization services. You\'ll need to upload your Aadhaar/PAN for verification. This is required by law for notarization services.'
-    },
-    {
-      category: 'account',
-      question: 'Can I access my documents later?',
-      answer: 'Yes! All your documents are stored in your dashboard. You can access, download, or re-order them anytime. Documents are stored securely for your account lifetime.'
-    },
-    {
-      category: 'general',
-      question: 'What if I need help during the process?',
-      answer: 'We\'re here to help! You can: 1) Use live chat on our website, 2) Email us at support@legaldoji.com, 3) Call +91 123-456-7890 (Mon-Sat, 9 AM - 7 PM), 4) Check this FAQ page for quick answers.'
+  // Fetch FAQs from GraphQL
+  const { data, loading, error } = useFaQsQuery({
+    variables: {
+      category: selectedCategory === 'all' ? undefined : selectedCategory,
+      search: searchQuery || undefined
     }
-  ]
-
-  const filteredFAQs = faqs.filter(faq => {
-    const matchesCategory = selectedCategory === 'all' || faq.category === selectedCategory
-    const matchesSearch = faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          faq.answer.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesSearch
   })
+
+  // Map GraphQL FAQs to component format
+  const faqs = useMemo(() => {
+    if (!data?.faqs) return []
+    return data.faqs.map((faq) => ({
+      category: faq.category.toLowerCase(),
+      question: faq.question,
+      answer: faq.answer
+    }))
+  }, [data])
+
+  const filteredFAQs = useMemo(() => {
+    return faqs.filter(faq => {
+      const matchesCategory = selectedCategory === 'all' || faq.category === selectedCategory
+      const matchesSearch = !searchQuery || 
+        faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        faq.answer.toLowerCase().includes(searchQuery.toLowerCase())
+      return matchesCategory && matchesSearch
+    })
+  }, [faqs, selectedCategory, searchQuery])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-gray-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading FAQs...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Error loading FAQs: {error.message}</p>
+          <Link href="/" className="text-primary-600 hover:underline">Go back home</Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

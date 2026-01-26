@@ -61,12 +61,12 @@ class Document(Base, TimestampMixin, SoftDeleteMixin):
     current_step: Mapped[int | None] = mapped_column(Integer, nullable=True)
     pdf_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
 
-    user: Mapped["User"] = relationship("User", back_populates="documents", lazy="joined")
+    user: Mapped["User"] = relationship("User", back_populates="documents", lazy="noload")
     notary: Mapped["Notary | None"] = relationship(
-        "Notary", back_populates="documents", lazy="joined"
+        "Notary", back_populates="documents", lazy="noload"
     )
     template: Mapped["DocumentTemplate"] = relationship(
-        "DocumentTemplate", lazy="joined"
+        "DocumentTemplate", lazy="noload"
     )
 
     def __repr__(self) -> str:

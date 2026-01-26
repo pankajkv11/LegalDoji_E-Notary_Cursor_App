@@ -1,0 +1,14 @@
+query PricingPlans {
+  pricingPlans {
+    id
+    name
+    price
+    amount
+    period
+    features
+    popular
+    cta
+    createdAt
+    updatedAt
+  }
+}

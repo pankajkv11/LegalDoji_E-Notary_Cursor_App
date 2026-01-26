@@ -1,138 +1,137 @@
 'use client'
 
+import React from 'react'
 import Link from 'next/link'
-import { useState } from 'react'
 import {
   FileText, Upload, Package, Clock, CheckCircle, AlertCircle, Plus, Eye, Download,
-  TrendingUp, Calendar, Video, MapPin, Truck, Edit, User, Phone, Mail
+  TrendingUp, Calendar, Video, MapPin, Truck, Edit, User, Phone, Mail, Loader2
 } from 'lucide-react'
+import { useMeQuery, useMyDocumentsQuery, useMyOrdersQuery, useMyAppointmentsQuery, useMyDeliveriesQuery } from '@/graphql/generated/hooks'
 
 export default function UserDashboardPage() {
-  const [upcomingAppointments, setUpcomingAppointments] = useState([
-    {
-      id: 'APT-001',
-      notaryName: 'Adv. Ramesh Iyer',
-      documentType: 'Rental Agreement',
-      date: '2024-01-25',
-      time: '3:00 PM',
-      meetingLink: 'https://meet.legaldoji.com/apt-001',
-      status: 'confirmed',
-      notaryPhone: '+91 98765 43210',
-      location: 'Mumbai, Maharashtra'
-    },
-    {
-      id: 'APT-002',
-      notaryName: 'Adv. Meera Nair',
-      documentType: 'Power of Attorney',
-      date: '2024-01-26',
-      time: '11:00 AM',
-      meetingLink: 'https://meet.legaldoji.com/apt-002',
-      status: 'pending',
-      notaryPhone: '+91 98765 43211',
-      location: 'Bangalore, Karnataka'
-    }
-  ])
+  // Fetch user data
+  const { data: userData, loading: userLoading } = useMeQuery()
+  
+  // Fetch documents
+  const { data: documentsData, loading: documentsLoading } = useMyDocumentsQuery({
+    variables: { filter: { limit: 10 } }
+  })
 
-  const deliveryTracking = [
-    {
-      id: 'DEL-8921',
-      documentName: 'Rental Agreement - Mumbai Property',
-      status: 'in-transit',
-      courierPartner: 'Delhivery',
-      trackingNumber: 'DEL1234567890',
-      currentLocation: 'Mumbai Hub',
-      expectedDelivery: '2024-01-26',
-      stages: [
-        { name: 'Document Created', completed: true, date: '2024-01-22' },
-        { name: 'Notarized', completed: true, date: '2024-01-23' },
-        { name: 'Printed & Packed', completed: true, date: '2024-01-24' },
-        { name: 'In Transit', completed: true, date: '2024-01-25' },
-        { name: 'Out for Delivery', completed: false, date: null },
-        { name: 'Delivered', completed: false, date: null }
-      ]
-    },
-    {
-      id: 'DEL-8920',
-      documentName: 'Affidavit - General',
-      status: 'processing',
-      courierPartner: 'Blue Dart',
-      trackingNumber: 'BD9876543210',
-      currentLocation: 'Processing Center',
-      expectedDelivery: '2024-01-28',
-      stages: [
-        { name: 'Document Created', completed: true, date: '2024-01-24' },
-        { name: 'Notarized', completed: true, date: '2024-01-25' },
-        { name: 'Printed & Packed', completed: false, date: null },
-        { name: 'In Transit', completed: false, date: null },
-        { name: 'Out for Delivery', completed: false, date: null },
-        { name: 'Delivered', completed: false, date: null }
-      ]
-    }
-  ]
+  // Fetch orders
+  const { data: ordersData, loading: ordersLoading } = useMyOrdersQuery({
+    variables: { filter: { limit: 10 } }
+  })
 
-  const savedDrafts = [
-    {
-      id: 'DFT-001',
-      name: 'Sale Deed - Property Transfer',
-      documentType: 'Sale Deed',
-      lastEdited: '2024-01-24',
-      completionPercentage: 75,
-      step: 'Step 3 of 4'
-    },
-    {
-      id: 'DFT-002',
-      name: 'NDA Agreement - Business',
-      documentType: 'NDA',
-      lastEdited: '2024-01-23',
-      completionPercentage: 40,
-      step: 'Step 2 of 4'
-    },
-    {
-      id: 'DFT-003',
-      name: 'Employment Contract',
-      documentType: 'Contract',
-      lastEdited: '2024-01-22',
-      completionPercentage: 20,
-      step: 'Step 1 of 4'
-    }
-  ]
+  // Fetch appointments
+  const { data: appointmentsData, loading: appointmentsLoading } = useMyAppointmentsQuery({
+    variables: { status: undefined }
+  })
 
-  const stats = [
-    { name: 'Total Documents', value: '12', icon: FileText, color: 'bg-blue-500', trend: '+3 this month' },
-    { name: 'Active Orders', value: '3', icon: Package, color: 'bg-green-500', trend: '2 in transit' },
-    { name: 'Saved Drafts', value: savedDrafts.length.toString(), icon: Clock, color: 'bg-yellow-500', trend: 'Complete them' },
-    { name: 'Appointments', value: upcomingAppointments.length.toString(), icon: Calendar, color: 'bg-purple-500', trend: 'Upcoming' }
-  ]
+  // Fetch deliveries
+  const { data: deliveriesData, loading: deliveriesLoading } = useMyDeliveriesQuery()
 
-  const recentDocuments = [
-    {
-      id: 'DOC-001',
-      name: 'Rental Agreement - Mumbai Property',
-      type: 'Property',
-      status: 'completed',
-      date: '2024-01-20',
-      amount: '₹398',
-      notary: 'Adv. Ramesh Iyer'
-    },
-    {
-      id: 'DOC-002',
-      name: 'Employment Agreement - Tech Corp',
-      type: 'Business',
-      status: 'in-progress',
-      date: '2024-01-22',
-      amount: '₹999',
-      notary: 'Adv. Meera Nair'
-    },
-    {
-      id: 'DOC-003',
-      name: 'General Affidavit',
-      type: 'Personal',
-      status: 'notarized',
-      date: '2024-01-23',
-      amount: '₹398',
-      notary: 'Adv. Suresh Reddy'
-    }
-  ]
+  // Map GraphQL data to component format
+  const upcomingAppointments = React.useMemo(() => {
+    if (!appointmentsData?.myAppointments) return []
+    return appointmentsData.myAppointments
+      .filter((apt: any) => apt.status === 'PENDING' || apt.status === 'CONFIRMED')
+      .slice(0, 2)
+      .map((apt: any) => ({
+        id: apt.id,
+        notaryName: 'Notary', // Would need to fetch notary details
+        documentType: apt.documentType || 'Document',
+        date: apt.scheduledDate,
+        time: apt.scheduledTime,
+        meetingLink: apt.meetingLink || '#',
+        status: apt.status.toLowerCase(),
+        notaryPhone: '+91 98765 43210',
+        location: 'Location'
+      }))
+  }, [appointmentsData])
+
+  const deliveryTracking = React.useMemo(() => {
+    if (!deliveriesData?.myDeliveries) return []
+    return deliveriesData.myDeliveries.slice(0, 2).map((del: any) => ({
+      id: del.id,
+      documentName: del.documentName,
+      status: del.status.toLowerCase().replace('_', '-'),
+      courierPartner: del.courierPartner,
+      trackingNumber: del.trackingNumber,
+      currentLocation: del.currentLocation || 'Processing',
+      expectedDelivery: del.expectedDelivery,
+      stages: del.stages?.map((stage: any) => ({
+        name: stage.name,
+        completed: stage.completed,
+        date: stage.date
+      })) || []
+    }))
+  }, [deliveriesData])
+
+  const savedDrafts = React.useMemo(() => {
+    if (!documentsData?.myDocuments?.nodes) return []
+    return documentsData.myDocuments.nodes
+      .filter((doc: any) => doc.status === 'DRAFT')
+      .slice(0, 3)
+      .map((doc: any) => ({
+        id: doc.id,
+        name: doc.title,
+        documentType: doc.category,
+        lastEdited: new Date(doc.updatedAt).toLocaleDateString(),
+        completionPercentage: doc.completionPercentage || 0,
+        step: `Step ${doc.currentStep || 1} of ${doc.currentStep ? doc.currentStep + 1 : 4}`
+      }))
+  }, [documentsData])
+
+  const stats = React.useMemo(() => {
+    const totalDocs = documentsData?.myDocuments?.pageInfo?.totalCount || 0
+    const activeOrders = ordersData?.myOrders?.nodes?.filter((o: any) => 
+      o.status !== 'COMPLETED' && o.status !== 'CANCELLED'
+    ).length || 0
+    const drafts = savedDrafts.length
+    const appointments = upcomingAppointments.length
+
+    return [
+      { name: 'Total Documents', value: totalDocs.toString(), icon: FileText, color: 'bg-blue-500', trend: '+3 this month' },
+      { name: 'Active Orders', value: activeOrders.toString(), icon: Package, color: 'bg-green-500', trend: '2 in transit' },
+      { name: 'Saved Drafts', value: drafts.toString(), icon: Clock, color: 'bg-yellow-500', trend: 'Complete them' },
+      { name: 'Appointments', value: appointments.toString(), icon: Calendar, color: 'bg-purple-500', trend: 'Upcoming' }
+    ]
+  }, [documentsData, ordersData, savedDrafts, upcomingAppointments])
+
+  const recentDocuments = React.useMemo(() => {
+    if (!documentsData?.myDocuments?.nodes) return []
+    return documentsData.myDocuments.nodes.slice(0, 3).map((doc: any) => ({
+      id: doc.id,
+      name: doc.title,
+      type: doc.category,
+      status: doc.status.toLowerCase(),
+      date: new Date(doc.createdAt).toLocaleDateString(),
+      amount: '₹398', // Would need to fetch from order
+      notary: 'Notary' // Would need to fetch notary details
+    }))
+  }, [documentsData])
+
+  if (userLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-gray-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!userData?.me) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">Please log in to view your dashboard</p>
+          <Link href="/login" className="text-primary-600 hover:underline">Go to Login</Link>
+        </div>
+      </div>
+    )
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
@@ -317,7 +316,7 @@ export default function UserDashboardPage() {
 
                   {/* Delivery Progress */}
                   <div className="space-y-3">
-                    {delivery.stages.map((stage, index) => (
+                    {delivery.stages.map((stage: any, index: number) => (
                       <div key={index} className="flex items-start gap-3">
                         <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
                           stage.completed ? 'bg-green-500' : 'bg-gray-200'

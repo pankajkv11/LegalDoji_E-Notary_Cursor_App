@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Mail, Phone, MapPin, Clock, MessageCircle, Send } from 'lucide-react'
+import { Mail, Phone, MapPin, Clock, MessageCircle, Send, Loader2, CheckCircle } from 'lucide-react'
+import { useSubmitContactMutation } from '@/graphql/generated/hooks'
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -11,10 +12,29 @@ export default function ContactPage() {
     subject: '',
     message: ''
   })
+  const [submitted, setSubmitted] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [submitContact, { loading, error }] = useSubmitContactMutation({
+    onCompleted: () => {
+      setSubmitted(true)
+      setFormData({ name: '', email: '', phone: '', subject: '', message: '' })
+      setTimeout(() => setSubmitted(false), 5000)
+    }
+  })
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    alert('Thank you for contacting us! We will get back to you soon.')
+    await submitContact({
+      variables: {
+        input: {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone || undefined,
+          subject: formData.subject,
+          message: formData.message
+        }
+      }
+    })
   }
 
   const contactInfo = [
@@ -138,12 +158,33 @@ export default function ContactPage() {
                 />
               </div>
 
+              {submitted && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-2 text-green-700">
+                  <CheckCircle className="h-5 w-5" />
+                  <span>Thank you! Your message has been sent successfully.</span>
+                </div>
+              )}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+                  Error: {error.message}
+                </div>
+              )}
               <button
                 type="submit"
-                className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all"
+                disabled={loading}
+                className="w-full bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all"
               >
-                <Send className="h-5 w-5" />
-                Send Message
+                {loading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-5 w-5" />
+                    Send Message
+                  </>
+                )}
               </button>
             </form>
           </div>

@@ -1,0 +1,18 @@
+query MyDeliveries {
+  myDeliveries {
+    id
+    orderId
+    documentName
+    status
+    courierPartner
+    trackingNumber
+    currentLocation
+    expectedDelivery
+    stages {
+      name
+      completed
+      date
+    }
+    createdAt
+  }
+}

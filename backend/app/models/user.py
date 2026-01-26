@@ -47,18 +47,18 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
         UUID(as_uuid=False), ForeignKey("roles.id"), nullable=True
     )
 
-    role_obj: Mapped["Role | None"] = relationship("Role", backref="users", lazy="joined")
+    role_obj: Mapped["Role | None"] = relationship("Role", backref="users", lazy="noload")
     documents: Mapped[list["Document"]] = relationship(
-        "Document", back_populates="user", lazy="selectin"
+        "Document", back_populates="user", lazy="noload"
     )
     orders: Mapped[list["Order"]] = relationship(
-        "Order", back_populates="user", lazy="selectin"
+        "Order", back_populates="user", lazy="noload"
     )
     appointments: Mapped[list["Appointment"]] = relationship(
-        "Appointment", back_populates="user", lazy="selectin"
+        "Appointment", back_populates="user", lazy="noload"
     )
     addresses: Mapped[list["Address"]] = relationship(
-        "Address", back_populates="user", lazy="selectin"
+        "Address", back_populates="user", lazy="noload"
     )
 
     def __repr__(self) -> str:

@@ -46,15 +46,15 @@ class Notary(Base, TimestampMixin, SoftDeleteMixin):
     bank_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     bank_branch: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
-    user: Mapped["User"] = relationship("User", backref="notary_profile", lazy="joined")
+    user: Mapped["User"] = relationship("User", backref="notary_profile", lazy="noload")
     documents: Mapped[list["Document"]] = relationship(
-        "Document", back_populates="notary", lazy="selectin"
+        "Document", back_populates="notary", lazy="noload"
     )
     appointments: Mapped[list["Appointment"]] = relationship(
-        "Appointment", back_populates="notary", lazy="selectin"
+        "Appointment", back_populates="notary", lazy="noload"
     )
     availability: Mapped["NotaryAvailability | None"] = relationship(
-        "NotaryAvailability", back_populates="notary", uselist=False, lazy="joined"
+        "NotaryAvailability", back_populates="notary", uselist=False, lazy="noload"
     )
 
     def __repr__(self) -> str:
@@ -75,7 +75,7 @@ class NotaryAvailability(Base, TimestampMixin):
     break_end: Mapped[str | None] = mapped_column(String(8), nullable=True)
 
     notary: Mapped["Notary"] = relationship(
-        "Notary", back_populates="availability", lazy="joined"
+        "Notary", back_populates="availability", lazy="noload"
     )
 
 

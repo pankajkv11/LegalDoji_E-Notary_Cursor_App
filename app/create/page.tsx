@@ -3,51 +3,69 @@
 import React, { useState, useMemo, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Save, HelpCircle, Eye, FileText, CheckCircle, MessageCircle } from 'lucide-react'
-import {
-  documentTemplates,
-  documentCategories,
-  getDocumentTitle,
-  getShortDescription,
-  saveCreateDraft,
-  type CreateDraft,
-} from '@/lib/document-templates'
+import { ArrowLeft, Save, HelpCircle, Eye, FileText, CheckCircle, MessageCircle, Loader2 } from 'lucide-react'
+import { useDocumentTemplatesQuery, useDocumentTemplateQuery, useCreateDocumentMutation } from '@/graphql/generated/hooks'
 import { getFieldConfig } from '@/lib/document-fields'
 
 function CreateDocumentContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [showDocumentSelector, setShowDocumentSelector] = useState(true)
-  const [selectedTemplate, setSelectedTemplate] = useState('')
+  const [selectedTemplateSlug, setSelectedTemplateSlug] = useState('')
   const [currentStep, setCurrentStep] = useState(1)
   const [autoSaved, setAutoSaved] = useState(false)
   const [draftSaved, setDraftSaved] = useState(false)
-  const [formData, setFormData] = useState<Record<string, string>>({})
+  const [formData, setFormData] = useState<Record<string, any>>({})
 
   const templateFromUrl = searchParams.get('template')
 
-  useEffect(() => {
-    if (templateFromUrl && documentTemplates[templateFromUrl]) {
-      setSelectedTemplate(templateFromUrl)
-      const t = documentTemplates[templateFromUrl]
-      setFormData(t.defaultValues)
-      setShowDocumentSelector(false)
-      setCurrentStep(1)
+  // Fetch all templates
+  const { data: templatesData, loading: templatesLoading } = useDocumentTemplatesQuery()
+
+  // Fetch specific template by slug
+  const { data: templateData, loading: templateLoading } = useDocumentTemplateQuery({
+    variables: { slug: selectedTemplateSlug },
+    skip: !selectedTemplateSlug
+  })
+
+  const [createDocument, { loading: creating }] = useCreateDocumentMutation({
+    onCompleted: (data) => {
+      if (data.createDocument) {
+        router.push(`/create/checkout?documentId=${data.createDocument.id}`)
+      }
     }
-  }, [templateFromUrl])
+  })
+
+  useEffect(() => {
+    if (templateFromUrl && templatesData?.documentTemplates) {
+      const template = templatesData.documentTemplates.find((t: any) => t.slug === templateFromUrl)
+      if (template) {
+        setSelectedTemplateSlug(templateFromUrl)
+        setFormData((template.defaultValues as Record<string, any>) || {})
+        setShowDocumentSelector(false)
+        setCurrentStep(1)
+      }
+    }
+  }, [templateFromUrl, templatesData])
 
   const currentTemplate = useMemo(() => {
-    return documentTemplates[selectedTemplate] || documentTemplates['flat-rental-agreement']
-  }, [selectedTemplate])
+    if (templateData?.documentTemplate) {
+      return templateData.documentTemplate
+    }
+    if (templatesData?.documentTemplates && selectedTemplateSlug) {
+      return templatesData.documentTemplates.find((t: any) => t.slug === selectedTemplateSlug)
+    }
+    return null
+  }, [templateData, templatesData, selectedTemplateSlug])
 
   const totalSteps = currentTemplate?.steps?.length || 4
 
   const handleDocumentSelect = () => {
-    if (selectedTemplate) {
+    if (selectedTemplateSlug) {
       // Initialize form data with template defaults
-      const template = documentTemplates[selectedTemplate]
-      if (template) {
-        setFormData(template.defaultValues)
+      const template = templatesData?.documentTemplates?.find((t: any) => t.slug === selectedTemplateSlug)
+      if (template && template.defaultValues) {
+        setFormData(template.defaultValues as Record<string, any>)
       }
       setShowDocumentSelector(false)
       setCurrentStep(1)
@@ -65,31 +83,48 @@ function CreateDocumentContent() {
     }, 500)
   }
 
-  function buildDraft(): CreateDraft | null {
-    if (!selectedTemplate || !currentTemplate) return null
-    return {
-      templateId: selectedTemplate,
-      templateName: currentTemplate.name,
-      formData: { ...formData },
-      documentTitle: getDocumentTitle(selectedTemplate, formData),
-      shortDescription: getShortDescription(selectedTemplate, formData),
-    }
-  }
-
-  const handleSaveDraft = () => {
-    const draft = buildDraft()
-    if (draft) {
-      saveCreateDraft(draft)
+  const handleSaveDraft = async () => {
+    if (!currentTemplate || !selectedTemplateSlug) return
+    
+    try {
+      await createDocument({
+        variables: {
+          input: {
+            templateId: currentTemplate.id,
+            title: formData.title || currentTemplate.name,
+            formData: formData,
+            currentStep: currentStep
+          }
+        }
+      })
       setDraftSaved(true)
       setTimeout(() => setDraftSaved(false), 3000)
+    } catch (error) {
+      console.error('Error saving draft:', error)
     }
   }
 
-  const handleContinueToCheckout = () => {
-    const draft = buildDraft()
-    if (!draft) return
-    saveCreateDraft(draft)
-    router.push('/create/checkout')
+  const handleContinueToCheckout = async () => {
+    if (!currentTemplate || !selectedTemplateSlug) return
+    
+    try {
+      const result = await createDocument({
+        variables: {
+          input: {
+            templateId: currentTemplate.id,
+            title: formData.title || currentTemplate.name,
+            formData: formData,
+            currentStep: currentStep
+          }
+        }
+      })
+      
+      if (result.data?.createDocument) {
+        router.push(`/create/checkout?documentId=${result.data.createDocument.id}`)
+      }
+    } catch (error) {
+      console.error('Error creating document:', error)
+    }
   }
 
   // Render field based on configuration
@@ -154,7 +189,7 @@ function CreateDocumentContent() {
 
   // Render document preview based on template type
   const renderPreview = () => {
-    switch (selectedTemplate) {
+    switch (selectedTemplateSlug) {
       case 'flat-rental-agreement':
       case 'house-rental-agreement':
       case 'commercial-office-agreement':
@@ -298,7 +333,7 @@ function CreateDocumentContent() {
       default:
         return (
           <div className="prose prose-sm max-w-none">
-            <h1 className="text-xl font-bold text-center mb-6">{currentTemplate.name?.toUpperCase()}</h1>
+            <h1 className="text-xl font-bold text-center mb-6">{currentTemplate?.name?.toUpperCase() || 'Document'}</h1>
             <p className="text-gray-500 text-center">Preview will be generated based on your input</p>
           </div>
         )
@@ -322,19 +357,15 @@ function CreateDocumentContent() {
                 Select Document Type *
               </label>
               <select
-                value={selectedTemplate}
-                onChange={(e) => setSelectedTemplate(e.target.value)}
+                value={selectedTemplateSlug}
+                onChange={(e) => setSelectedTemplateSlug(e.target.value)}
                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-base"
               >
                 <option value="">-- Choose a document type --</option>
-                {documentCategories.map((cat) => (
-                  <optgroup key={cat.category} label={cat.category}>
-                    {cat.documents.map((doc) => (
-                      <option key={doc} value={doc.toLowerCase().replace(/\s+/g, '-')}>
-                        {doc}
-                      </option>
-                    ))}
-                  </optgroup>
+                {templatesData?.documentTemplates?.map((template: any) => (
+                  <option key={template.id} value={template.slug}>
+                    {template.name}
+                  </option>
                 ))}
               </select>
 
@@ -369,7 +400,7 @@ function CreateDocumentContent() {
                   </button>
                   <div>
                     <h1 className="text-xl font-bold text-gray-900">
-                      Create {selectedTemplate ? selectedTemplate.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Document'}
+                      Create {selectedTemplateSlug ? selectedTemplateSlug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Document'}
                     </h1>
                     <p className="text-sm text-gray-600">Step {currentStep} of {totalSteps}</p>
                   </div>
@@ -411,7 +442,7 @@ function CreateDocumentContent() {
             {/* Step Navigation */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <div className="flex gap-2 mb-6">
-                {currentTemplate.steps.map((step) => (
+                {currentTemplate?.steps?.map((step) => (
                   <button
                     key={step.id}
                     onClick={() => setCurrentStep(step.id)}
@@ -430,7 +461,7 @@ function CreateDocumentContent() {
               </div>
 
               {/* Dynamic Step Rendering */}
-              {currentTemplate.steps.map((step: any) => (
+              {currentTemplate?.steps?.map((step: any) => (
                 currentStep === step.id && (
                   <div key={step.id} className="space-y-4">
                     <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">

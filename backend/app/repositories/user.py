@@ -1,5 +1,5 @@
 """User repository."""
-from sqlalchemy import select
+from sqlalchemy import select, cast, String
 from sqlalchemy.orm import selectinload
 
 from app.models.user import User
@@ -26,12 +26,11 @@ class UserRepository(BaseRepository[User]):
         return result.scalar_one_or_none()
 
     async def get_by_id_with_relations(self, id: str) -> User | None:
-        q = select(User).where(User.id == id)
+        # Cast id column to String to match VARCHAR type in database
+        # Don't use selectinload - it causes type mismatch errors
+        # Load relationships explicitly when needed using repository methods
+        q = select(User).where(cast(User.id, String) == id)
         if hasattr(User, "deleted_at"):
             q = q.where(User.deleted_at.is_(None))
-        q = q.options(
-            selectinload(User.addresses),
-            selectinload(User.role_obj),
-        )
         result = await self.session.execute(q)
         return result.scalar_one_or_none()

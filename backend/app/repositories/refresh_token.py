@@ -1,5 +1,5 @@
 """Refresh token repository."""
-from sqlalchemy import select
+from sqlalchemy import select, cast, String
 from datetime import datetime, timezone
 
 from app.models.refresh_token import RefreshToken
@@ -21,7 +21,7 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
 
     async def revoke_by_user(self, user_id: str) -> None:
         tokens = await self.session.execute(
-            select(RefreshToken).where(RefreshToken.user_id == user_id)
+            select(RefreshToken).where(cast(RefreshToken.user_id, String) == user_id)
         )
         for t in tokens.scalars().all():
             t.revoked = True

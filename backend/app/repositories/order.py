@@ -1,5 +1,5 @@
 """Order repository."""
-from sqlalchemy import select, desc, func
+from sqlalchemy import select, desc, func, cast, String
 
 from app.models.order import Order
 from app.models.enums import OrderStatus, OrderType
@@ -20,7 +20,7 @@ class OrderRepository(BaseRepository[Order]):
         offset: int = 0,
     ):
         q = select(Order).where(
-            Order.user_id == user_id,
+            cast(Order.user_id, String) == user_id,
             Order.deleted_at.is_(None),
         )
         if status is not None:
@@ -37,7 +37,7 @@ class OrderRepository(BaseRepository[Order]):
         status: OrderStatus | None = None,
     ) -> int:
         q = select(func.count()).select_from(Order).where(
-            Order.user_id == user_id,
+            cast(Order.user_id, String) == user_id,
             Order.deleted_at.is_(None),
         )
         if status is not None:

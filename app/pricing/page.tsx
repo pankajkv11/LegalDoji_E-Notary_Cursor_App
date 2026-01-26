@@ -1,50 +1,34 @@
+'use client'
+
+import React from 'react'
 import Link from 'next/link'
-import { CheckCircle, X, HelpCircle, FileText, Stamp, Truck, Video, Clock, Shield } from 'lucide-react'
+import { CheckCircle, X, HelpCircle, FileText, Stamp, Truck, Video, Clock, Shield, Loader2 } from 'lucide-react'
+import { usePricingPlansQuery, useFaQsQuery } from '@/graphql/generated/hooks'
 
 export default function PricingPage() {
-  const pricingPlans = [
-    {
-      name: 'Basic',
-      price: '₹249',
-      period: 'per document',
-      description: 'Perfect for simple digital documents',
-      features: [
-        { name: 'Digital document creation', included: true },
-        { name: 'Basic templates library', included: true },
-        { name: 'PDF download', included: false },
-        { name: 'Email support', included: false },
-        { name: 'Valid across India', included: true },
-        { name: 'Video notarization', included: false },
-        { name: 'E-stamp paper', included: false },
-        { name: 'Physical delivery', included: false },
-        { name: 'Priority support', included: false }
-      ],
-      cta: 'Get Started',
-      popular: false,
-      color: 'blue'
-    },
-   
-    {
-      name: 'Premium',
-      price: '₹999/',
-      period: '30 min',
-      description: 'Complete service with delivery',
-      features: [
-        { name: 'Everything in Standard', included: true },
-        { name: 'E-stamp paper (state-wise)', included: true },
-        { name: 'Physical document printing', included: true },
-        { name: 'Courier delivery (₹149)', included: true },
-        { name: 'Express processing', included: true },
-        { name: 'Dedicated support', included: true },
-        { name: 'Document storage', included: true },
-        { name: 'Re-print service', included: true },
-        { name: 'Track & trace', included: true }
-      ],
-      cta: 'Go Premium',
-      popular: false,
-      color: 'purple'
-    }
-  ]
+  const { data: pricingData, loading: pricingLoading, error: pricingError } = usePricingPlansQuery()
+  const { data: faqsData, loading: faqsLoading } = useFaQsQuery({
+    variables: { category: 'pricing' }
+  })
+
+  // Map GraphQL pricing plans to component format
+  const pricingPlans = React.useMemo(() => {
+    if (!pricingData?.pricingPlans) return []
+    
+    return pricingData.pricingPlans.map((plan) => ({
+      name: plan.name,
+      price: plan.price,
+      period: plan.period || 'per document',
+      description: plan.name,
+      features: (plan.features || []).map((feature: string) => ({
+        name: feature,
+        included: true
+      })),
+      cta: plan.cta || 'Get Started',
+      popular: plan.popular || false,
+      color: plan.popular ? 'blue' : 'gray'
+    }))
+  }, [pricingData])
 
   const addOns = [
     {
@@ -77,32 +61,37 @@ export default function PricingPage() {
     }
   ]
 
-  const faqs = [
-    {
-      question: 'What payment methods do you accept?',
-      answer: 'We accept all major payment methods including credit/debit cards, UPI, net banking, and digital wallets through Razorpay.'
-    },
-    {
-      question: 'Is there any refund policy?',
-      answer: 'Yes, we offer full refund if the document is not created. For notarization, refunds are available if the session couldn\'t be completed due to technical issues on our end.'
-    },
-    {
-      question: 'How is e-stamp duty calculated?',
-      answer: 'E-stamp duty varies by state and document type. It\'s calculated automatically based on your document details and location. You\'ll see the exact amount before payment.'
-    },
-    {
-      question: 'Can I upgrade my plan later?',
-      answer: 'Yes! You can add notarization, e-stamp, or delivery services to any existing document from your dashboard.'
-    },
-    {
-      question: 'Are there any hidden charges?',
-      answer: 'Absolutely not. The price you see is the price you pay. All additional services (e-stamp, delivery) are clearly shown before checkout.'
-    },
-    {
-      question: 'Do you offer bulk discounts?',
-      answer: 'Yes, for 10+ documents, contact our sales team for custom pricing. Business accounts get special rates.'
-    }
-  ]
+  // Map GraphQL FAQs to component format
+  const faqs = React.useMemo(() => {
+    if (!faqsData?.faqs) return []
+    
+    return faqsData.faqs.map((faq) => ({
+      question: faq.question,
+      answer: faq.answer
+    }))
+  }, [faqsData])
+
+  if (pricingLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-gray-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading pricing information...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (pricingError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Error loading pricing: {pricingError.message}</p>
+          <Link href="/" className="text-primary-600 hover:underline">Go back home</Link>
+        </div>
+      </div>
+    )
+  }
 
   const comparisonTable = [
     { feature: 'Document Templates', basic: '20+', standard: '50+', premium: '50+' },

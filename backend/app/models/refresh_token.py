@@ -28,7 +28,7 @@ class RefreshToken(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    user: Mapped["User"] = relationship("User", backref="refresh_tokens", lazy="joined")
+    user: Mapped["User"] = relationship("User", backref="refresh_tokens", lazy="noload")
 
     def __repr__(self) -> str:
         return f"<RefreshToken {self.id}>"

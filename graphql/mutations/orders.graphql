@@ -1,0 +1,54 @@
+mutation CreateOrder($input: CheckoutInput!) {
+  createOrder(input: $input) {
+    id
+    orderNumber
+    userId
+    documentId
+    type
+    status
+    basePrice
+    deliveryFee
+    discount
+    totalAmount
+    couponCode
+    createdAt
+    updatedAt
+  }
+}
+
+mutation ApplyCoupon($documentId: String!, $code: String!) {
+  applyCoupon(documentId: $documentId, code: $code) {
+    basePrice
+    deliveryFee
+    subtotal
+    discount
+    total
+    couponApplied
+  }
+}
+
+mutation CreatePayment($orderId: String!) {
+  createPayment(orderId: $orderId) {
+    id
+    orderId
+    amount
+    currency
+    status
+    method
+    razorpayOrderId
+    createdAt
+  }
+}
+
+mutation ConfirmPayment($orderId: String!, $razorpayPaymentId: String!) {
+  confirmPayment(orderId: $orderId, razorpayPaymentId: $razorpayPaymentId) {
+    id
+    orderId
+    amount
+    status
+    method
+    razorpayPaymentId
+    paidAt
+  }
+}
+

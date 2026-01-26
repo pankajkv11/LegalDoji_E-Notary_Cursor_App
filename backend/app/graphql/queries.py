@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from typing import Optional, List
 
 import strawberry
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, cast, String
 
 from app.graphql.context import Context
 from app.graphql.types import (
@@ -73,7 +73,8 @@ class Query:
         if not user:
             return None
         svc = UserService(ctx.session)
-        u = await svc.get_me(user.id)
+        # Use get() instead of get_by_id_with_relations to avoid type mismatch
+        u = await svc.get_by_id(str(user.id))
         if not u:
             return None
         perms = svc.permissions_for_user(u)
@@ -118,7 +119,8 @@ class Query:
         ctx.require_user()
         repo = DocumentRepository(ctx.session)
         d = await repo.get(id)
-        return doc_to_gql(d) if d and d.user_id == ctx.user.id else None
+        # Use string comparison to avoid type mismatch
+        return doc_to_gql(d) if d and str(d.user_id) == str(ctx.user.id) else None
 
     @strawberry.field
     async def my_documents(
@@ -179,7 +181,8 @@ class Query:
         user = ctx.require_user()
         repo = OrderRepository(ctx.session)
         o = await repo.get(id)
-        return order_to_gql(o) if o and o.user_id == user.id else None
+        # Use string comparison to avoid type mismatch
+        return order_to_gql(o) if o and str(o.user_id) == str(user.id) else None
 
     @strawberry.field
     async def my_orders(
@@ -233,12 +236,12 @@ class Query:
         user = ctx.require_user()
         result = await ctx.session.execute(
             select(Appointment).where(
-                Appointment.id == id,
+                cast(Appointment.id, String) == id,
                 Appointment.deleted_at.is_(None),
             )
         )
         a = result.scalar_one_or_none()
-        if not a or a.user_id != user.id:
+        if not a or cast(Appointment.user_id, String) != str(user.id):
             return None
         return appointment_to_gql(a)
 
@@ -287,7 +290,7 @@ class Query:
         from app.models.order import Delivery
         user = ctx.require_user()
         result = await ctx.session.execute(
-            select(Order).where(Order.id == order_id, Order.user_id == user.id)
+            select(Order).where(cast(Order.id, String) == order_id, cast(Order.user_id, String) == str(user.id))
         )
         o = result.scalar_one_or_none()
         if not o or not o.delivery:
@@ -301,8 +304,8 @@ class Query:
         user = ctx.require_user()
         result = await ctx.session.execute(
             select(Delivery)
-            .join(Order, Order.id == Delivery.order_id)
-            .where(Order.user_id == user.id, Order.deleted_at.is_(None), Delivery.deleted_at.is_(None))
+            .join(Order, cast(Order.id, String) == cast(Delivery.order_id, String))
+            .where(cast(Order.user_id, String) == str(user.id), Order.deleted_at.is_(None), Delivery.deleted_at.is_(None))
         )
         items = result.scalars().all()
         return [delivery_to_gql(d) for d in items]

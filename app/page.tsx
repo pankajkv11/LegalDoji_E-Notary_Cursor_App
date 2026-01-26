@@ -1,41 +1,125 @@
+'use client'
+
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowRight, FileText, Home as HomeIcon, Briefcase, Scale, CheckCircle, Upload, Video, Download, Shield, Award, Clock, Star, ChevronRight } from 'lucide-react'
+import { ArrowRight, FileText, Home as HomeIcon, Briefcase, Scale, CheckCircle, Upload, Video, Download, Shield, Award, Clock, Star, ChevronRight, Loader2 } from 'lucide-react'
+import { useDocumentTemplatesQuery, usePricingPlansQuery, useServicesQuery, useFaQsQuery } from '@/graphql/generated/hooks'
 
 export default function HomePage() {
-  const documentCategories = [
-    {
-      title: 'Property Documents',
-      icon: HomeIcon,
-      description: 'Rental agreements, sale deeds, leases, NOCs',
-      examples: ['Rental Agreement', 'Sale Deed', 'Lease Agreement', 'NOC'],
-      color: 'bg-gray-700',
-      href: '/services?category=property'
-    },
-    {
-      title: 'Personal Documents',
-      icon: FileText,
-      description: 'Affidavits, POA, wills, name change',
-      examples: ['Affidavit', 'Power of Attorney', 'Will', 'Name Change'],
-      color: 'bg-gray-600',
-      href: '/services?category=personal'
-    },
-    {
-      title: 'Business Documents',
-      icon: Briefcase,
-      description: 'NDAs, employment, partnership agreements',
-      examples: ['NDA', 'Employment Contract', 'Partnership Deed', 'Service Agreement'],
-      color: 'bg-gray-800',
-      href: '/services?category=business'
-    },
-    {
-      title: 'Legal Documents',
-      icon: Scale,
-      description: 'Vakalatnama, court affidavits, undertakings',
-      examples: ['Vakalatnama', 'Court Affidavit', 'Undertaking', 'Legal Notice'],
-      color: 'bg-gray-900',
-      href: '/services?category=legal'
+  const [mounted, setMounted] = useState(false)
+
+  // Only run queries after component mounts (client-side only)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Use non-blocking queries with error handling - page will render even if backend is unavailable
+  // These queries will not block page rendering - they use errorPolicy: 'all' to continue on errors
+  // Using 'cache-first' so if cache is empty, it will try network but won't block
+  const { data: templatesData, loading: templatesLoading, error: templatesError } = useDocumentTemplatesQuery({
+    skip: !mounted, // Skip until mounted
+    errorPolicy: 'all',
+    fetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: false,
+    // Don't wait for network - use cache if available, otherwise use fallback
+    nextFetchPolicy: 'cache-first'
+  })
+  const { data: pricingData, loading: pricingLoading, error: pricingError } = usePricingPlansQuery({
+    skip: !mounted,
+    errorPolicy: 'all',
+    fetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: false,
+    nextFetchPolicy: 'cache-first'
+  })
+  const { data: servicesData, error: servicesError } = useServicesQuery({
+    skip: !mounted,
+    errorPolicy: 'all',
+    fetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: false,
+    nextFetchPolicy: 'cache-first'
+  })
+  const { data: faqsData, error: faqsError } = useFaQsQuery({ 
+    skip: !mounted,
+    variables: { category: undefined },
+    errorPolicy: 'all',
+    fetchPolicy: 'cache-first',
+    notifyOnNetworkStatusChange: false,
+    nextFetchPolicy: 'cache-first'
+  })
+  
+  // Log errors for debugging but don't block rendering
+  useEffect(() => {
+    if (templatesError) console.warn('Templates query error:', templatesError)
+    if (pricingError) console.warn('Pricing query error:', pricingError)
+    if (servicesError) console.warn('Services query error:', servicesError)
+    if (faqsError) console.warn('FAQs query error:', faqsError)
+  }, [templatesError, pricingError, servicesError, faqsError])
+
+  // Group document templates by category
+  const documentCategories = React.useMemo(() => {
+    if (!templatesData?.documentTemplates) {
+      return [
+        {
+          title: 'Property Documents',
+          icon: HomeIcon,
+          description: 'Rental agreements, sale deeds, leases, NOCs',
+          examples: ['Rental Agreement', 'Sale Deed', 'Lease Agreement', 'NOC'],
+          color: 'bg-gray-700',
+          href: '/services?category=property'
+        },
+        {
+          title: 'Personal Documents',
+          icon: FileText,
+          description: 'Affidavits, POA, wills, name change',
+          examples: ['Affidavit', 'Power of Attorney', 'Will', 'Name Change'],
+          color: 'bg-gray-600',
+          href: '/services?category=personal'
+        },
+        {
+          title: 'Business Documents',
+          icon: Briefcase,
+          description: 'NDAs, employment, partnership agreements',
+          examples: ['NDA', 'Employment Contract', 'Partnership Deed', 'Service Agreement'],
+          color: 'bg-gray-800',
+          href: '/services?category=business'
+        },
+        {
+          title: 'Legal Documents',
+          icon: Scale,
+          description: 'Vakalatnama, court affidavits, undertakings',
+          examples: ['Vakalatnama', 'Court Affidavit', 'Undertaking', 'Legal Notice'],
+          color: 'bg-gray-900',
+          href: '/services?category=legal'
+        }
+      ]
     }
-  ]
+
+    // Group templates by category
+    const grouped = templatesData.documentTemplates.reduce((acc: any, template: any) => {
+      const cat = template.category || 'other'
+      if (!acc[cat]) {
+        acc[cat] = []
+      }
+      acc[cat].push(template.name)
+      return acc
+    }, {})
+
+    const categoryMap: Record<string, { title: string; icon: any; color: string }> = {
+      property: { title: 'Property Documents', icon: HomeIcon, color: 'bg-gray-700' },
+      personal: { title: 'Personal Documents', icon: FileText, color: 'bg-gray-600' },
+      business: { title: 'Business Documents', icon: Briefcase, color: 'bg-gray-800' },
+      legal: { title: 'Legal Documents', icon: Scale, color: 'bg-gray-900' }
+    }
+
+    return Object.entries(grouped).map(([category, examples]: [string, any]) => ({
+      title: categoryMap[category]?.title || `${category} Documents`,
+      icon: categoryMap[category]?.icon || FileText,
+      description: `${examples.length} document templates available`,
+      examples: examples.slice(0, 4),
+      color: categoryMap[category]?.color || 'bg-gray-700',
+      href: `/services?category=${category}`
+    }))
+  }, [templatesData])
 
   const howItWorks = [
     {
@@ -61,40 +145,55 @@ export default function HomePage() {
     }
   ]
 
-  const pricingPlans = [
-    {
-      name: 'Document Creation',
-      price: '₹249',
-      description: 'Perfect for simple documents',
-      features: [
-        'Digital document creation',
-        'Professional templates',
-        'PDF download',
-        'Email support',
-        'Valid across India',
-        'Add ₹149 for delivery'
-      ],
-      cta: 'Get Started',
-      popular: false,
-      href: '/dashboard/create'
-    },
-    {
-      name: 'Video Notarization',
-      price: '₹999',
-      description: 'Complete notarization service',
-      features: [
-        'Online video consultation',
-        'Verified notary session',
-        'Digital signature & seal',
-        'Court-accepted documents',
-        'Priority support',
-        'Instant processing'
-      ],
-      cta: 'Choose Video Notarization',
-      popular: true,
-      href: '/dashboard/create'
+  // Map GraphQL pricing plans
+  const pricingPlans = React.useMemo(() => {
+    if (!pricingData?.pricingPlans || pricingData.pricingPlans.length === 0) {
+      return [
+        {
+          name: 'Document Creation',
+          price: '₹249',
+          description: 'Perfect for simple documents',
+          features: [
+            'Digital document creation',
+            'Professional templates',
+            'PDF download',
+            'Email support',
+            'Valid across India',
+            'Add ₹149 for delivery'
+          ],
+          cta: 'Get Started',
+          popular: false,
+          href: '/dashboard/create'
+        },
+        {
+          name: 'Video Notarization',
+          price: '₹999',
+          description: 'Complete notarization service',
+          features: [
+            'Online video consultation',
+            'Verified notary session',
+            'Digital signature & seal',
+            'Court-accepted documents',
+            'Priority support',
+            'Instant processing'
+          ],
+          cta: 'Choose Video Notarization',
+          popular: true,
+          href: '/dashboard/create'
+        }
+      ]
     }
-  ]
+
+    return pricingData.pricingPlans.slice(0, 2).map((plan) => ({
+      name: plan.name,
+      price: plan.price,
+      description: plan.name,
+      features: plan.features || [],
+      cta: plan.cta || 'Get Started',
+      popular: plan.popular || false,
+      href: '/dashboard/create'
+    }))
+  }, [pricingData])
 
   const trustIndicators = [
     { icon: Shield, label: 'Verified Notaries', value: '500+' },
@@ -127,13 +226,24 @@ export default function HomePage() {
     }
   ]
 
-  const faqs = [
-    { question: 'Are documents legally valid?', answer: 'Yes, all notarized documents are court-accepted across India' },
-    { question: 'How long does notarization take?', answer: 'Typically 15-30 minutes for video notarization' },
-    { question: 'What documents do I need?', answer: 'Valid ID proof (Aadhaar/PAN) for notarization' },
-    { question: 'Is my data secure?', answer: 'Yes, we use bank-grade encryption for all documents' }
-  ]
+  // Map GraphQL FAQs (show first 4)
+  const faqs = React.useMemo(() => {
+    if (!faqsData?.faqs || faqsData.faqs.length === 0) {
+      return [
+        { question: 'Are documents legally valid?', answer: 'Yes, all notarized documents are court-accepted across India' },
+        { question: 'How long does notarization take?', answer: 'Typically 15-30 minutes for video notarization' },
+        { question: 'What documents do I need?', answer: 'Valid ID proof (Aadhaar/PAN) for notarization' },
+        { question: 'Is my data secure?', answer: 'Yes, we use bank-grade encryption for all documents' }
+      ]
+    }
+    return faqsData.faqs.slice(0, 4).map((faq) => ({
+      question: faq.question,
+      answer: faq.answer
+    }))
+  }, [faqsData])
 
+  // Show page even if queries are loading or have errors (non-blocking)
+  // The page will use fallback data if queries fail
   return (
     <div className="bg-gray-50">
       {/* Hero Section */}
@@ -228,7 +338,7 @@ export default function HomePage() {
                   <h3 className="text-xl font-bold text-gray-900 mb-2">{category.title}</h3>
                   <p className="text-gray-600 text-sm mb-4">{category.description}</p>
                   <ul className="space-y-1 mb-4">
-                    {category.examples.slice(0, 3).map((example, i) => (
+                    {category.examples.slice(0, 3).map((example: string, i: number) => (
                       <li key={i} className="text-xs text-gray-500 flex items-center gap-2">
                         <ChevronRight className="h-3 w-3 text-gray-900" />
                         {example}
