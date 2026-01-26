@@ -1,0 +1,42 @@
+query MyOrders($filter: OrdersFilterInput) {
+  myOrders(filter: $filter) {
+    nodes {
+      id
+      orderNumber
+      userId
+      documentId
+      type
+      status
+      basePrice
+      deliveryFee
+      discount
+      totalAmount
+      couponCode
+      createdAt
+      updatedAt
+    }
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      totalCount
+    }
+  }
+}
+
+query Order($id: String!) {
+  order(id: $id) {
+    id
+    orderNumber
+    userId
+    documentId
+    type
+    status
+    basePrice
+    deliveryFee
+    discount
+    totalAmount
+    couponCode
+    createdAt
+    updatedAt
+  }
+}

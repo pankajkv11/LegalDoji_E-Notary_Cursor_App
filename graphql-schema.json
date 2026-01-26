@@ -1,0 +1,937 @@
+{
+  "schema": {
+    "name": "LegalDoji E-Notary API",
+    "description": "Production GraphQL schema for E-Notary v2.1. Covers auth, users, roles, documents, templates, orders, payments, appointments, delivery, notary application & profile, admin stats & settings, services, FAQ, contact, pricing, and address CRUD.",
+    "version": "2.1.0",
+    "enums": [
+      {
+        "name": "UserRole",
+        "description": "User role in the platform",
+        "values": [
+          { "name": "USER", "description": "Client creating documents" },
+          { "name": "NOTARY", "description": "Verified advocate/notary" },
+          { "name": "ADMIN", "description": "Platform administrator" }
+        ]
+      },
+      {
+        "name": "UserStatus",
+        "description": "Account status",
+        "values": [
+          { "name": "ACTIVE", "description": "Account active" },
+          { "name": "INACTIVE", "description": "Account inactive" },
+          { "name": "SUSPENDED", "description": "Account suspended" },
+          { "name": "PENDING_VERIFICATION", "description": "Awaiting verification" }
+        ]
+      },
+      {
+        "name": "DocumentStatus",
+        "description": "Status of a document",
+        "values": [
+          { "name": "DRAFT", "description": "Saved but not submitted" },
+          { "name": "IN_PROGRESS", "description": "Creation or processing" },
+          { "name": "NOTARIZED", "description": "Notarization complete" },
+          { "name": "COMPLETED", "description": "Fully completed" },
+          { "name": "CANCELLED", "description": "Cancelled" }
+        ]
+      },
+      {
+        "name": "DocumentCategory",
+        "description": "Document category for templates",
+        "values": [
+          { "name": "PROPERTY", "description": "Property documents" },
+          { "name": "PERSONAL", "description": "Personal & family" },
+          { "name": "BUSINESS", "description": "Business documents" },
+          { "name": "LEGAL", "description": "Legal/court documents" },
+          { "name": "RENT_LEASE", "description": "Rent & lease" },
+          { "name": "AFFIDAVITS", "description": "Affidavits" },
+          { "name": "MANAGING_BUSINESS", "description": "Managing business" }
+        ]
+      },
+      {
+        "name": "OrderType",
+        "description": "Type of order",
+        "values": [
+          { "name": "PHYSICAL_DELIVERY", "description": "Document creation + physical delivery" },
+          { "name": "VIDEO_CONSULTATION", "description": "Video notarization + delivery" }
+        ]
+      },
+      {
+        "name": "OrderStatus",
+        "description": "Order lifecycle status",
+        "values": [
+          { "name": "PENDING", "description": "Awaiting payment" },
+          { "name": "PAID", "description": "Payment received" },
+          { "name": "PROCESSING", "description": "Being processed" },
+          { "name": "NOTARIZED", "description": "Notarization done" },
+          { "name": "SHIPPED", "description": "Dispatched for delivery" },
+          { "name": "DELIVERED", "description": "Delivered" },
+          { "name": "CANCELLED", "description": "Cancelled" },
+          { "name": "REFUNDED", "description": "Refunded" }
+        ]
+      },
+      {
+        "name": "AppointmentStatus",
+        "description": "Video consultation appointment status",
+        "values": [
+          { "name": "PENDING", "description": "Awaiting notary acceptance" },
+          { "name": "CONFIRMED", "description": "Confirmed" },
+          { "name": "COMPLETED", "description": "Session completed" },
+          { "name": "CANCELLED", "description": "Cancelled" },
+          { "name": "NO_SHOW", "description": "Client did not join" }
+        ]
+      },
+      {
+        "name": "DeliveryStatus",
+        "description": "Physical delivery status",
+        "values": [
+          { "name": "PROCESSING", "description": "Being prepared" },
+          { "name": "PRINTED_PACKED", "description": "Printed and packed" },
+          { "name": "IN_TRANSIT", "description": "With courier" },
+          { "name": "OUT_FOR_DELIVERY", "description": "Out for delivery" },
+          { "name": "DELIVERED", "description": "Delivered" }
+        ]
+      },
+      {
+        "name": "PaymentStatus",
+        "description": "Payment status",
+        "values": [
+          { "name": "PENDING", "description": "Awaiting payment" },
+          { "name": "COMPLETED", "description": "Payment successful" },
+          { "name": "FAILED", "description": "Payment failed" },
+          { "name": "REFUNDED", "description": "Refunded" }
+        ]
+      },
+      {
+        "name": "PaymentMethod",
+        "description": "Payment method",
+        "values": [
+          { "name": "CARD", "description": "Credit/debit card" },
+          { "name": "UPI", "description": "UPI" },
+          { "name": "NET_BANKING", "description": "Net banking" },
+          { "name": "WALLET", "description": "Wallet" }
+        ]
+      },
+      {
+        "name": "NotaryApplicationStatus",
+        "description": "Notary application review status",
+        "values": [
+          { "name": "PENDING", "description": "Under review" },
+          { "name": "APPROVED", "description": "Approved" },
+          { "name": "REJECTED", "description": "Rejected" }
+        ]
+      },
+      {
+        "name": "DayOfWeek",
+        "description": "Weekday for availability",
+        "values": [
+          { "name": "MONDAY" },
+          { "name": "TUESDAY" },
+          { "name": "WEDNESDAY" },
+          { "name": "THURSDAY" },
+          { "name": "FRIDAY" },
+          { "name": "SATURDAY" },
+          { "name": "SUNDAY" }
+        ]
+      },
+      {
+        "name": "FAQCategory",
+        "description": "FAQ category",
+        "values": [
+          { "name": "GENERAL" },
+          { "name": "DOCUMENTS" },
+          { "name": "NOTARIZATION" },
+          { "name": "PRICING" },
+          { "name": "DELIVERY" },
+          { "name": "ACCOUNT" }
+        ]
+      },
+      {
+        "name": "LoginMethod",
+        "description": "Authentication method",
+        "values": [
+          { "name": "EMAIL" },
+          { "name": "PHONE" },
+          { "name": "GOOGLE" }
+        ]
+      }
+    ],
+    "types": [
+      {
+        "name": "User",
+        "description": "Platform user (client, notary, or admin)",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "Unique user ID" },
+          { "name": "email", "type": "String!", "description": "Email address" },
+          { "name": "phone", "type": "String", "description": "Phone number" },
+          { "name": "name", "type": "String!", "description": "Full name" },
+          { "name": "role", "type": "UserRole!", "description": "User role" },
+          { "name": "status", "type": "UserStatus!", "description": "Account status" },
+          { "name": "emailVerified", "type": "Boolean!", "description": "Email verified" },
+          { "name": "phoneVerified", "type": "Boolean!", "description": "Phone verified" },
+          { "name": "createdAt", "type": "DateTime!", "description": "Account creation time" },
+          { "name": "updatedAt", "type": "DateTime!", "description": "Last update time" },
+          { "name": "documents", "type": "[Document!]!", "description": "User's documents", "args": [{ "name": "status", "type": "DocumentStatus" }, { "name": "limit", "type": "Int" }, { "name": "offset", "type": "Int" }] },
+          { "name": "orders", "type": "[Order!]!", "description": "User's orders", "args": [{ "name": "status", "type": "OrderStatus" }, { "name": "limit", "type": "Int" }] },
+          { "name": "appointments", "type": "[Appointment!]!", "description": "User's appointments", "args": [{ "name": "status", "type": "AppointmentStatus" }] },
+          { "name": "addresses", "type": "[Address!]!", "description": "Saved delivery addresses" }
+        ]
+      },
+      {
+        "name": "Notary",
+        "description": "Verified notary/advocate",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "Unique notary ID" },
+          { "name": "userId", "type": "ID!", "description": "Associated user ID" },
+          { "name": "user", "type": "User!", "description": "User account" },
+          { "name": "fullName", "type": "String!", "description": "Display name" },
+          { "name": "email", "type": "String!", "description": "Email" },
+          { "name": "phone", "type": "String!", "description": "Phone" },
+          { "name": "photoUrl", "type": "String", "description": "Profile photo URL" },
+          { "name": "licenseNumber", "type": "String!", "description": "Notary license number" },
+          { "name": "barCouncilNumber", "type": "String!", "description": "Bar council registration" },
+          { "name": "barCouncilState", "type": "String!", "description": "Bar council state" },
+          { "name": "enrollmentDate", "type": "Date!", "description": "Enrollment date" },
+          { "name": "experience", "type": "Int!", "description": "Years of experience" },
+          { "name": "specialization", "type": "[String!]!", "description": "Specializations" },
+          { "name": "languages", "type": "[String!]!", "description": "Languages spoken" },
+          { "name": "location", "type": "String!", "description": "Location" },
+          { "name": "consultationFee", "type": "Int!", "description": "Fee in INR" },
+          { "name": "rating", "type": "Float!", "description": "Average rating" },
+          { "name": "reviewsCount", "type": "Int!", "description": "Total reviews" },
+          { "name": "completedSessions", "type": "Int!", "description": "Sessions completed" },
+          { "name": "bio", "type": "String", "description": "Professional bio" },
+          { "name": "isVerified", "type": "Boolean!", "description": "Verification status" },
+          { "name": "verificationDate", "type": "DateTime", "description": "When verified" },
+          { "name": "availability", "type": "NotaryAvailability", "description": "Weekly availability" },
+          { "name": "appointments", "type": "[Appointment!]!", "description": "Appointments", "args": [{ "name": "status", "type": "AppointmentStatus" }] },
+          { "name": "earnings", "type": "NotaryEarnings", "description": "Earnings summary" },
+          { "name": "bankDetails", "type": "BankDetails", "description": "Payout bank details" }
+        ]
+      },
+      {
+        "name": "Document",
+        "description": "Legal document (created or uploaded)",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "Unique document ID" },
+          { "name": "userId", "type": "ID!", "description": "Owner user ID" },
+          { "name": "user", "type": "User!", "description": "Owner" },
+          { "name": "notaryId", "type": "ID", "description": "Assigned notary (if any)" },
+          { "name": "notary", "type": "Notary", "description": "Assigned notary" },
+          { "name": "orderId", "type": "ID", "description": "Related order ID" },
+          { "name": "order", "type": "Order", "description": "Related order" },
+          { "name": "templateId", "type": "String!", "description": "Document template slug" },
+          { "name": "template", "type": "DocumentTemplate", "description": "Template definition" },
+          { "name": "title", "type": "String!", "description": "Document title" },
+          { "name": "category", "type": "DocumentCategory!", "description": "Document category" },
+          { "name": "status", "type": "DocumentStatus!", "description": "Current status" },
+          { "name": "formData", "type": "JSON!", "description": "Form field values (JSON)" },
+          { "name": "completionPercentage", "type": "Int", "description": "Draft completion %" },
+          { "name": "currentStep", "type": "Int", "description": "Current form step" },
+          { "name": "pdfUrl", "type": "String", "description": "Generated PDF URL" },
+          { "name": "createdAt", "type": "DateTime!", "description": "Creation time" },
+          { "name": "updatedAt", "type": "DateTime!", "description": "Last update" },
+          { "name": "lastEditedAt", "type": "DateTime", "description": "Last edit (drafts)" }
+        ]
+      },
+      {
+        "name": "DocumentTemplate",
+        "description": "Document template with steps and fields",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "Template ID" },
+          { "name": "slug", "type": "String!", "description": "URL-friendly slug" },
+          { "name": "name", "type": "String!", "description": "Display name" },
+          { "name": "category", "type": "DocumentCategory!", "description": "Category" },
+          { "name": "steps", "type": "[TemplateStep!]!", "description": "Form steps" },
+          { "name": "defaultValues", "type": "JSON!", "description": "Default form values" },
+          { "name": "fieldConfigs", "type": "JSON!", "description": "Field configs (label, type, required)" }
+        ]
+      },
+      {
+        "name": "TemplateStep",
+        "description": "Single step in document template",
+        "fields": [
+          { "name": "id", "type": "Int!", "description": "Step number" },
+          { "name": "title", "type": "String!", "description": "Step title" },
+          { "name": "fields", "type": "[String!]!", "description": "Field names in this step" }
+        ]
+      },
+      {
+        "name": "Order",
+        "description": "Purchase order (document or consultation)",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "Order ID" },
+          { "name": "orderNumber", "type": "String!", "description": "Human-readable order number" },
+          { "name": "userId", "type": "ID!", "description": "Customer user ID" },
+          { "name": "user", "type": "User!", "description": "Customer" },
+          { "name": "documentId", "type": "ID", "description": "Related document (if applicable)" },
+          { "name": "document", "type": "Document", "description": "Related document" },
+          { "name": "appointmentId", "type": "ID", "description": "Related appointment (video consultation)" },
+          { "name": "appointment", "type": "Appointment", "description": "Related appointment" },
+          { "name": "type", "type": "OrderType!", "description": "Order type" },
+          { "name": "status", "type": "OrderStatus!", "description": "Order status" },
+          { "name": "basePrice", "type": "Int!", "description": "Document creation price (INR)" },
+          { "name": "deliveryFee", "type": "Int", "description": "Delivery fee (INR)" },
+          { "name": "discount", "type": "Int", "description": "Discount amount (INR)" },
+          { "name": "totalAmount", "type": "Int!", "description": "Total amount (INR)" },
+          { "name": "couponCode", "type": "String", "description": "Applied coupon code" },
+          { "name": "payment", "type": "Payment", "description": "Payment record" },
+          { "name": "delivery", "type": "Delivery", "description": "Physical delivery (if applicable)" },
+          { "name": "deliveryAddress", "type": "Address", "description": "Shipping address" },
+          { "name": "createdAt", "type": "DateTime!", "description": "Order creation time" },
+          { "name": "updatedAt", "type": "DateTime!", "description": "Last update" }
+        ]
+      },
+      {
+        "name": "CheckoutSummary",
+        "description": "Checkout price breakdown",
+        "fields": [
+          { "name": "basePrice", "type": "Int!", "description": "Document creation (INR)" },
+          { "name": "deliveryFee", "type": "Int!", "description": "Delivery fee (INR)" },
+          { "name": "subtotal", "type": "Int!", "description": "Before discount" },
+          { "name": "discount", "type": "Int!", "description": "Discount amount" },
+          { "name": "total", "type": "Int!", "description": "Final total" },
+          { "name": "couponApplied", "type": "Boolean!", "description": "Whether coupon was applied" }
+        ]
+      },
+      {
+        "name": "Payment",
+        "description": "Payment record",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "Payment ID" },
+          { "name": "orderId", "type": "ID!", "description": "Related order ID" },
+          { "name": "order", "type": "Order!", "description": "Related order" },
+          { "name": "amount", "type": "Int!", "description": "Amount in INR" },
+          { "name": "currency", "type": "String!", "description": "Currency code" },
+          { "name": "status", "type": "PaymentStatus!", "description": "Payment status" },
+          { "name": "method", "type": "PaymentMethod!", "description": "Payment method" },
+          { "name": "razorpayOrderId", "type": "String", "description": "Razorpay order ID" },
+          { "name": "razorpayPaymentId", "type": "String", "description": "Razorpay payment ID" },
+          { "name": "paidAt", "type": "DateTime", "description": "When payment completed" },
+          { "name": "createdAt", "type": "DateTime!", "description": "Creation time" }
+        ]
+      },
+      {
+        "name": "Appointment",
+        "description": "Video consultation appointment",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "Appointment ID" },
+          { "name": "userId", "type": "ID!", "description": "Client user ID" },
+          { "name": "user", "type": "User!", "description": "Client" },
+          { "name": "notaryId", "type": "ID!", "description": "Notary ID" },
+          { "name": "notary", "type": "Notary!", "description": "Notary" },
+          { "name": "documentType", "type": "String", "description": "Document type for session" },
+          { "name": "scheduledDate", "type": "Date!", "description": "Appointment date" },
+          { "name": "scheduledTime", "type": "String!", "description": "Time slot" },
+          { "name": "status", "type": "AppointmentStatus!", "description": "Status" },
+          { "name": "amount", "type": "Int!", "description": "Consultation fee (INR)" },
+          { "name": "meetingLink", "type": "String", "description": "Video meeting URL" },
+          { "name": "notes", "type": "String", "description": "Client notes" },
+          { "name": "orderId", "type": "ID", "description": "Related order ID" },
+          { "name": "order", "type": "Order", "description": "Related order" },
+          { "name": "createdAt", "type": "DateTime!", "description": "Booking time" },
+          { "name": "updatedAt", "type": "DateTime!", "description": "Last update" }
+        ]
+      },
+      {
+        "name": "Delivery",
+        "description": "Physical delivery tracking",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "Delivery ID" },
+          { "name": "orderId", "type": "ID!", "description": "Related order ID" },
+          { "name": "order", "type": "Order!", "description": "Related order" },
+          { "name": "documentName", "type": "String!", "description": "Document title" },
+          { "name": "status", "type": "DeliveryStatus!", "description": "Delivery status" },
+          { "name": "courierPartner", "type": "String!", "description": "Courier name" },
+          { "name": "trackingNumber", "type": "String!", "description": "Tracking number" },
+          { "name": "currentLocation", "type": "String", "description": "Current location" },
+          { "name": "expectedDelivery", "type": "Date", "description": "Expected delivery date" },
+          { "name": "stages", "type": "[DeliveryStage!]!", "description": "Tracking stages" },
+          { "name": "createdAt", "type": "DateTime!", "description": "Creation time" }
+        ]
+      },
+      {
+        "name": "DeliveryStage",
+        "description": "Single stage in delivery timeline",
+        "fields": [
+          { "name": "name", "type": "String!", "description": "Stage name" },
+          { "name": "completed", "type": "Boolean!", "description": "Whether completed" },
+          { "name": "date", "type": "DateTime", "description": "Completion date" }
+        ]
+      },
+      {
+        "name": "Address",
+        "description": "Delivery or user address",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "Address ID" },
+          { "name": "userId", "type": "ID!", "description": "Owner user ID" },
+          { "name": "label", "type": "String", "description": "Address label" },
+          { "name": "line1", "type": "String!", "description": "Address line 1" },
+          { "name": "line2", "type": "String", "description": "Address line 2" },
+          { "name": "city", "type": "String!", "description": "City" },
+          { "name": "state", "type": "String!", "description": "State" },
+          { "name": "pincode", "type": "String!", "description": "PIN code" },
+          { "name": "country", "type": "String!", "description": "Country" },
+          { "name": "isDefault", "type": "Boolean!", "description": "Default delivery address" }
+        ]
+      },
+      {
+        "name": "TimeSlot",
+        "description": "Available time slot for scheduling",
+        "fields": [
+          { "name": "date", "type": "Date!", "description": "Date" },
+          { "name": "slots", "type": "[String!]!", "description": "Available times (e.g. 09:00 AM)" }
+        ]
+      },
+      {
+        "name": "NotaryAvailability",
+        "description": "Notary weekly availability",
+        "fields": [
+          { "name": "days", "type": "[DayAvailability!]!", "description": "Per-day availability" },
+          { "name": "breakStart", "type": "String", "description": "Break start (HH:mm)" },
+          { "name": "breakEnd", "type": "String", "description": "Break end (HH:mm)" }
+        ]
+      },
+      {
+        "name": "DayAvailability",
+        "description": "Availability for a single day",
+        "fields": [
+          { "name": "day", "type": "DayOfWeek!", "description": "Day of week" },
+          { "name": "enabled", "type": "Boolean!", "description": "Whether available" },
+          { "name": "slots", "type": "[TimeRange!]!", "description": "Time ranges" }
+        ]
+      },
+      {
+        "name": "TimeRange",
+        "description": "Start–end time range",
+        "fields": [
+          { "name": "start", "type": "String!", "description": "Start time (HH:mm)" },
+          { "name": "end", "type": "String!", "description": "End time (HH:mm)" }
+        ]
+      },
+      {
+        "name": "NotaryEarnings",
+        "description": "Notary earnings summary",
+        "fields": [
+          { "name": "todayEarnings", "type": "Int!", "description": "Today (INR)" },
+          { "name": "weekEarnings", "type": "Int!", "description": "This week (INR)" },
+          { "name": "monthEarnings", "type": "Int!", "description": "This month (INR)" },
+          { "name": "totalEarnings", "type": "Int!", "description": "All time (INR)" },
+          { "name": "pendingPayouts", "type": "Int!", "description": "Pending payout (INR)" }
+        ]
+      },
+      {
+        "name": "BankDetails",
+        "description": "Notary bank details for payouts",
+        "fields": [
+          { "name": "accountHolderName", "type": "String!", "description": "Account holder" },
+          { "name": "accountNumber", "type": "String!", "description": "Account number" },
+          { "name": "ifscCode", "type": "String!", "description": "IFSC" },
+          { "name": "bankName", "type": "String!", "description": "Bank name" },
+          { "name": "branchName", "type": "String", "description": "Branch" }
+        ]
+      },
+      {
+        "name": "NotaryApplication",
+        "description": "Notary onboarding application",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "Application ID" },
+          { "name": "applicationNumber", "type": "String!", "description": "Human-readable ID" },
+          { "name": "userId", "type": "ID", "description": "Applicant user ID (if registered)" },
+          { "name": "firstName", "type": "String!", "description": "First name" },
+          { "name": "middleName", "type": "String", "description": "Middle name" },
+          { "name": "lastName", "type": "String!", "description": "Last name" },
+          { "name": "email", "type": "String!", "description": "Email" },
+          { "name": "phone", "type": "String!", "description": "Phone" },
+          { "name": "licenseNumber", "type": "String", "description": "License number" },
+          { "name": "barCouncilNumber", "type": "String", "description": "Bar council number" },
+          { "name": "experience", "type": "String", "description": "Experience" },
+          { "name": "specialization", "type": "String", "description": "Specialization" },
+          { "name": "location", "type": "String", "description": "Location" },
+          { "name": "status", "type": "NotaryApplicationStatus!", "description": "Review status" },
+          { "name": "documents", "type": "ApplicationDocuments", "description": "Uploaded docs" },
+          { "name": "appliedAt", "type": "DateTime!", "description": "Application date" },
+          { "name": "reviewedAt", "type": "DateTime", "description": "Review date" }
+        ]
+      },
+      {
+        "name": "ApplicationDocuments",
+        "description": "Uploaded application documents",
+        "fields": [
+          { "name": "certificate", "type": "String", "description": "Notary certificate URL" },
+          { "name": "idProof", "type": "String", "description": "ID proof URL" },
+          { "name": "barCouncilCert", "type": "String", "description": "Bar council cert URL" }
+        ]
+      },
+      {
+        "name": "Service",
+        "description": "Platform service (physical delivery / video consultation)",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "Service ID" },
+          { "name": "name", "type": "String!", "description": "Service name" },
+          { "name": "description", "type": "String!", "description": "Description" },
+          { "name": "price", "type": "String!", "description": "Display price (e.g. ₹398)" },
+          { "name": "basePrice", "type": "Int", "description": "Base price INR" },
+          { "name": "deliveryFee", "type": "Int", "description": "Delivery fee INR" },
+          { "name": "flow", "type": "[String!]!", "description": "How it works steps" },
+          { "name": "features", "type": "[String!]!", "description": "Features" },
+          { "name": "includes", "type": "[String!]!", "description": "What's included" },
+          { "name": "popular", "type": "Boolean!", "description": "Featured as popular" }
+        ]
+      },
+      {
+        "name": "FAQ",
+        "description": "Frequently asked question",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "FAQ ID" },
+          { "name": "category", "type": "FAQCategory!", "description": "Category" },
+          { "name": "question", "type": "String!", "description": "Question" },
+          { "name": "answer", "type": "String!", "description": "Answer" }
+        ]
+      },
+      {
+        "name": "ContactSubmission",
+        "description": "Contact form submission",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "Submission ID" },
+          { "name": "name", "type": "String!", "description": "Sender name" },
+          { "name": "email", "type": "String!", "description": "Email" },
+          { "name": "phone", "type": "String", "description": "Phone" },
+          { "name": "subject", "type": "String!", "description": "Subject" },
+          { "name": "message", "type": "String!", "description": "Message" },
+          { "name": "createdAt", "type": "DateTime!", "description": "Submission time" }
+        ]
+      },
+      {
+        "name": "Review",
+        "description": "Notary/session review",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "Review ID" },
+          { "name": "userId", "type": "ID!", "description": "Reviewer user ID" },
+          { "name": "notaryId", "type": "ID!", "description": "Notary ID" },
+          { "name": "sessionId", "type": "ID", "description": "Session/appointment ID" },
+          { "name": "rating", "type": "Int!", "description": "Rating 1–5" },
+          { "name": "comment", "type": "String", "description": "Review text" },
+          { "name": "createdAt", "type": "DateTime!", "description": "Review time" }
+        ]
+      },
+      {
+        "name": "AdminStats",
+        "description": "Admin dashboard statistics",
+        "fields": [
+          { "name": "totalUsers", "type": "Int!", "description": "Total users" },
+          { "name": "totalDocuments", "type": "Int!", "description": "Total documents" },
+          { "name": "activeNotaries", "type": "Int!", "description": "Active notaries" },
+          { "name": "pendingApplications", "type": "Int!", "description": "Pending notary applications" },
+          { "name": "revenueMonth", "type": "Float!", "description": "Monthly revenue" },
+          { "name": "pendingOrders", "type": "Int!", "description": "Pending orders" },
+          { "name": "activeSessions", "type": "Int!", "description": "Active video sessions" },
+          { "name": "supportTickets", "type": "Int!", "description": "Open support tickets" }
+        ]
+      },
+      {
+        "name": "ReportRevenueByType",
+        "description": "Revenue by document type",
+        "fields": [
+          { "name": "type", "type": "String!", "description": "Document type" },
+          { "name": "amount", "type": "Float!", "description": "Revenue" },
+          { "name": "count", "type": "Int!", "description": "Document count" },
+          { "name": "percentage", "type": "Int!", "description": "Share %" }
+        ]
+      },
+      {
+        "name": "Transaction",
+        "description": "Transaction for reports",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "Transaction ID" },
+          { "name": "document", "type": "String!", "description": "Document title" },
+          { "name": "client", "type": "String!", "description": "Client name" },
+          { "name": "amount", "type": "Int!", "description": "Amount INR" },
+          { "name": "date", "type": "Date!", "description": "Date" },
+          { "name": "time", "type": "String", "description": "Time" },
+          { "name": "status", "type": "String!", "description": "Status" }
+        ]
+      },
+      {
+        "name": "AuthPayload",
+        "description": "Authentication response",
+        "fields": [
+          { "name": "accessToken", "type": "String!", "description": "JWT access token" },
+          { "name": "refreshToken", "type": "String!", "description": "Refresh token" },
+          { "name": "expiresIn", "type": "Int!", "description": "Access token TTL (seconds)" },
+          { "name": "user", "type": "User!", "description": "Authenticated user" }
+        ]
+      },
+      {
+        "name": "OTPResponse",
+        "description": "OTP send response",
+        "fields": [
+          { "name": "success", "type": "Boolean!", "description": "Whether OTP was sent" },
+          { "name": "message", "type": "String!", "description": "Message" },
+          { "name": "expiresIn", "type": "Int", "description": "OTP expiry seconds" }
+        ]
+      },
+      {
+        "name": "PageInfo",
+        "description": "Pagination info",
+        "fields": [
+          { "name": "hasNextPage", "type": "Boolean!", "description": "Has next page" },
+          { "name": "hasPreviousPage", "type": "Boolean!", "description": "Has previous page" },
+          { "name": "totalCount", "type": "Int!", "description": "Total items" }
+        ]
+      },
+      {
+        "name": "DocumentConnection",
+        "description": "Paginated documents",
+        "fields": [
+          { "name": "nodes", "type": "[Document!]!", "description": "Documents" },
+          { "name": "pageInfo", "type": "PageInfo!", "description": "Pagination" }
+        ]
+      },
+      {
+        "name": "OrderConnection",
+        "description": "Paginated orders",
+        "fields": [
+          { "name": "nodes", "type": "[Order!]!", "description": "Orders" },
+          { "name": "pageInfo", "type": "PageInfo!", "description": "Pagination" }
+        ]
+      },
+      {
+        "name": "PricingPlan",
+        "description": "Pricing tier (Basic, Standard, Premium)",
+        "fields": [
+          { "name": "id", "type": "ID!", "description": "Plan ID" },
+          { "name": "name", "type": "String!", "description": "Plan name" },
+          { "name": "price", "type": "String!", "description": "Display price (e.g. ₹398)" },
+          { "name": "amount", "type": "Int!", "description": "Amount in INR" },
+          { "name": "period", "type": "String", "description": "Billing period" },
+          { "name": "features", "type": "[String!]!", "description": "Feature list" },
+          { "name": "popular", "type": "Boolean!", "description": "Featured plan" },
+          { "name": "cta", "type": "String!", "description": "CTA label" }
+        ]
+      },
+      {
+        "name": "ForgotPasswordResponse",
+        "description": "Forgot password response",
+        "fields": [
+          { "name": "success", "type": "Boolean!", "description": "Whether request was accepted" },
+          { "name": "message", "type": "String!", "description": "Message" }
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "name": "LoginInput",
+        "description": "Login credentials",
+        "inputFields": [
+          { "name": "method", "type": "LoginMethod!", "description": "Email, phone, or Google" },
+          { "name": "email", "type": "String", "description": "Email (if method=EMAIL)" },
+          { "name": "phone", "type": "String", "description": "Phone (if method=PHONE)" },
+          { "name": "password", "type": "String", "description": "Password (if applicable)" },
+          { "name": "otp", "type": "String", "description": "OTP (second step)" },
+          { "name": "googleIdToken", "type": "String", "description": "Google ID token (if method=GOOGLE)" }
+        ]
+      },
+      {
+        "name": "SignupInput",
+        "description": "User registration",
+        "inputFields": [
+          { "name": "name", "type": "String!", "description": "Full name" },
+          { "name": "email", "type": "String!", "description": "Email" },
+          { "name": "phone", "type": "String!", "description": "Phone" },
+          { "name": "password", "type": "String!", "description": "Password" },
+          { "name": "otp", "type": "String", "description": "Verification OTP" },
+          { "name": "acceptTerms", "type": "Boolean!", "description": "Terms accepted" }
+        ]
+      },
+      {
+        "name": "CreateDocumentInput",
+        "description": "Create or update document",
+        "inputFields": [
+          { "name": "templateId", "type": "String!", "description": "Template slug" },
+          { "name": "title", "type": "String", "description": "Optional title" },
+          { "name": "formData", "type": "JSON!", "description": "Form field values" },
+          { "name": "currentStep", "type": "Int", "description": "Current step" },
+          { "name": "draftId", "type": "ID", "description": "Existing draft ID to update" }
+        ]
+      },
+      {
+        "name": "CheckoutInput",
+        "description": "Checkout and create order",
+        "inputFields": [
+          { "name": "documentId", "type": "ID!", "description": "Document ID" },
+          { "name": "deliveryAddressId", "type": "ID!", "description": "Shipping address ID" },
+          { "name": "couponCode", "type": "String", "description": "Optional coupon" }
+        ]
+      },
+      {
+        "name": "CreateAppointmentInput",
+        "description": "Book video consultation",
+        "inputFields": [
+          { "name": "notaryId", "type": "ID!", "description": "Notary ID" },
+          { "name": "scheduledDate", "type": "Date!", "description": "Appointment date" },
+          { "name": "scheduledTime", "type": "String!", "description": "Time slot" },
+          { "name": "documentType", "type": "String", "description": "Document type" },
+          { "name": "notes", "type": "String", "description": "Notes" }
+        ]
+      },
+      {
+        "name": "NotaryApplicationInput",
+        "description": "Notary application form",
+        "inputFields": [
+          { "name": "firstName", "type": "String!", "description": "First name" },
+          { "name": "middleName", "type": "String", "description": "Middle name" },
+          { "name": "lastName", "type": "String!", "description": "Last name" },
+          { "name": "email", "type": "String!", "description": "Email" },
+          { "name": "phone", "type": "String!", "description": "Phone" },
+          { "name": "barCouncilFile", "type": "Upload!", "description": "Bar council certificate" }
+        ]
+      },
+      {
+        "name": "AvailabilityInput",
+        "description": "Notary availability update",
+        "inputFields": [
+          { "name": "days", "type": "[DayAvailabilityInput!]!", "description": "Per-day config" },
+          { "name": "breakStart", "type": "String", "description": "Break start HH:mm" },
+          { "name": "breakEnd", "type": "String", "description": "Break end HH:mm" }
+        ]
+      },
+      {
+        "name": "DayAvailabilityInput",
+        "description": "Single day availability",
+        "inputFields": [
+          { "name": "day", "type": "DayOfWeek!", "description": "Day" },
+          { "name": "enabled", "type": "Boolean!", "description": "Available" },
+          { "name": "slots", "type": "[TimeRangeInput!]!", "description": "Time slots" }
+        ]
+      },
+      {
+        "name": "TimeRangeInput",
+        "description": "Time range",
+        "inputFields": [
+          { "name": "start", "type": "String!", "description": "Start HH:mm" },
+          { "name": "end", "type": "String!", "description": "End HH:mm" }
+        ]
+      },
+      {
+        "name": "UpdateNotaryProfileInput",
+        "description": "Notary profile update",
+        "inputFields": [
+          { "name": "fullName", "type": "String", "description": "Display name" },
+          { "name": "phone", "type": "String", "description": "Phone" },
+          { "name": "alternatePhone", "type": "String", "description": "Alternate phone" },
+          { "name": "address", "type": "String", "description": "Address" },
+          { "name": "city", "type": "String", "description": "City" },
+          { "name": "state", "type": "String", "description": "State" },
+          { "name": "pincode", "type": "String", "description": "Pincode" },
+          { "name": "languages", "type": "String", "description": "Languages (comma-separated)" },
+          { "name": "consultationFee", "type": "Int", "description": "Fee INR" },
+          { "name": "bio", "type": "String", "description": "Bio" },
+          { "name": "accountHolderName", "type": "String", "description": "Bank account holder" },
+          { "name": "accountNumber", "type": "String", "description": "Account number" },
+          { "name": "ifscCode", "type": "String", "description": "IFSC" },
+          { "name": "bankName", "type": "String", "description": "Bank name" },
+          { "name": "branchName", "type": "String", "description": "Branch" }
+        ]
+      },
+      {
+        "name": "ContactInput",
+        "description": "Contact form",
+        "inputFields": [
+          { "name": "name", "type": "String!", "description": "Name" },
+          { "name": "email", "type": "String!", "description": "Email" },
+          { "name": "phone", "type": "String", "description": "Phone" },
+          { "name": "subject", "type": "String!", "description": "Subject" },
+          { "name": "message", "type": "String!", "description": "Message" }
+        ]
+      },
+      {
+        "name": "AdminSettingsInput",
+        "description": "Admin platform settings",
+        "inputFields": [
+          { "name": "siteName", "type": "String", "description": "Site name" },
+          { "name": "siteUrl", "type": "String", "description": "Site URL" },
+          { "name": "supportEmail", "type": "String", "description": "Support email" },
+          { "name": "supportPhone", "type": "String", "description": "Support phone" },
+          { "name": "address", "type": "String", "description": "Address" },
+          { "name": "emailNotifications", "type": "Boolean", "description": "Email notifications" },
+          { "name": "smsNotifications", "type": "Boolean", "description": "SMS notifications" },
+          { "name": "notifyOnNewUser", "type": "Boolean", "description": "Notify on new user" },
+          { "name": "notifyOnNewDocument", "type": "Boolean", "description": "Notify on new document" },
+          { "name": "notifyOnPayment", "type": "Boolean", "description": "Notify on payment" },
+          { "name": "razorpayEnabled", "type": "Boolean", "description": "Razorpay enabled" },
+          { "name": "razorpayKey", "type": "String", "description": "Razorpay key" },
+          { "name": "upiEnabled", "type": "Boolean", "description": "UPI enabled" },
+          { "name": "maxDocumentSize", "type": "Int", "description": "Max doc size MB" },
+          { "name": "allowedFormats", "type": "String", "description": "Allowed file formats" },
+          { "name": "autoDeleteDrafts", "type": "Int", "description": "Draft retention days" },
+          { "name": "requireVerification", "type": "Boolean", "description": "Notary verification required" },
+          { "name": "minExperience", "type": "Int", "description": "Min notary experience years" },
+          { "name": "maxSessionDuration", "type": "Int", "description": "Max session minutes" },
+          { "name": "notaryCommission", "type": "Float", "description": "Notary commission %" },
+          { "name": "twoFactorAuth", "type": "Boolean", "description": "2FA enabled" },
+          { "name": "sessionTimeout", "type": "Int", "description": "Session timeout minutes" },
+          { "name": "maintenanceMode", "type": "Boolean", "description": "Maintenance mode" }
+        ]
+      },
+      {
+        "name": "DocumentsFilter",
+        "description": "Filter for document list",
+        "inputFields": [
+          { "name": "status", "type": "DocumentStatus", "description": "Filter by status" },
+          { "name": "category", "type": "DocumentCategory", "description": "Filter by category" },
+          { "name": "limit", "type": "Int", "description": "Limit" },
+          { "name": "offset", "type": "Int", "description": "Offset" }
+        ]
+      },
+      {
+        "name": "OrdersFilter",
+        "description": "Filter for orders",
+        "inputFields": [
+          { "name": "status", "type": "OrderStatus", "description": "Filter by status" },
+          { "name": "type", "type": "OrderType", "description": "Filter by type" },
+          { "name": "limit", "type": "Int", "description": "Limit" },
+          { "name": "offset", "type": "Int", "description": "Offset" }
+        ]
+      },
+      {
+        "name": "ReportsFilter",
+        "description": "Filter for admin reports",
+        "inputFields": [
+          { "name": "dateRange", "type": "String", "description": "e.g. last30days" },
+          { "name": "startDate", "type": "Date", "description": "Start date" },
+          { "name": "endDate", "type": "Date", "description": "End date" }
+        ]
+      },
+      {
+        "name": "CreateAddressInput",
+        "description": "Create delivery address",
+        "inputFields": [
+          { "name": "label", "type": "String", "description": "Address label (e.g. Home, Office)" },
+          { "name": "line1", "type": "String!", "description": "Address line 1" },
+          { "name": "line2", "type": "String", "description": "Address line 2" },
+          { "name": "city", "type": "String!", "description": "City" },
+          { "name": "state", "type": "String!", "description": "State" },
+          { "name": "pincode", "type": "String!", "description": "PIN code" },
+          { "name": "country", "type": "String!", "description": "Country" },
+          { "name": "isDefault", "type": "Boolean", "description": "Set as default" }
+        ]
+      },
+      {
+        "name": "UpdateAddressInput",
+        "description": "Update delivery address",
+        "inputFields": [
+          { "name": "addressId", "type": "ID!", "description": "Address to update" },
+          { "name": "label", "type": "String", "description": "Address label" },
+          { "name": "line1", "type": "String", "description": "Address line 1" },
+          { "name": "line2", "type": "String", "description": "Address line 2" },
+          { "name": "city", "type": "String", "description": "City" },
+          { "name": "state", "type": "String", "description": "State" },
+          { "name": "pincode", "type": "String", "description": "PIN code" },
+          { "name": "country", "type": "String", "description": "Country" },
+          { "name": "isDefault", "type": "Boolean", "description": "Set as default" }
+        ]
+      },
+      {
+        "name": "ForgotPasswordInput",
+        "description": "Forgot password request",
+        "inputFields": [
+          { "name": "email", "type": "String", "description": "Email (if reset by email)" },
+          { "name": "phone", "type": "String", "description": "Phone (if reset by SMS)" }
+        ]
+      },
+      {
+        "name": "ResetPasswordInput",
+        "description": "Reset password with token",
+        "inputFields": [
+          { "name": "token", "type": "String!", "description": "Reset token from email/SMS" },
+          { "name": "newPassword", "type": "String!", "description": "New password" }
+        ]
+      },
+      {
+        "name": "ChangePasswordInput",
+        "description": "Change password (authenticated user)",
+        "inputFields": [
+          { "name": "currentPassword", "type": "String!", "description": "Current password" },
+          { "name": "newPassword", "type": "String!", "description": "New password" }
+        ]
+      },
+      {
+        "name": "UploadDocumentInput",
+        "description": "Upload existing document for notarization",
+        "inputFields": [
+          { "name": "file", "type": "Upload!", "description": "PDF/document file" },
+          { "name": "title", "type": "String", "description": "Document title" },
+          { "name": "templateId", "type": "String", "description": "Optional template slug" }
+        ]
+      }
+    ],
+    "queries": [
+      { "name": "me", "type": "User", "description": "Current authenticated user", "args": [] },
+      { "name": "user", "type": "User", "description": "User by ID", "args": [{ "name": "id", "type": "ID!" }] },
+      { "name": "notary", "type": "Notary", "description": "Notary by ID", "args": [{ "name": "id", "type": "ID!" }] },
+      { "name": "notaries", "type": "[Notary!]!", "description": "List notaries", "args": [{ "name": "specialization", "type": "String" }, { "name": "location", "type": "String" }] },
+      { "name": "document", "type": "Document", "description": "Document by ID", "args": [{ "name": "id", "type": "ID!" }] },
+      { "name": "myDocuments", "type": "DocumentConnection!", "description": "Current user's documents", "args": [{ "name": "filter", "type": "DocumentsFilter" }] },
+      { "name": "documentTemplates", "type": "[DocumentTemplate!]!", "description": "All document templates", "args": [{ "name": "category", "type": "DocumentCategory" }] },
+      { "name": "documentTemplate", "type": "DocumentTemplate", "description": "Template by slug", "args": [{ "name": "slug", "type": "String!" }] },
+      { "name": "order", "type": "Order", "description": "Order by ID", "args": [{ "name": "id", "type": "ID!" }] },
+      { "name": "myOrders", "type": "OrderConnection!", "description": "Current user's orders", "args": [{ "name": "filter", "type": "OrdersFilter" }] },
+      { "name": "checkoutSummary", "type": "CheckoutSummary!", "description": "Price breakdown for checkout", "args": [{ "name": "documentId", "type": "ID!" }, { "name": "couponCode", "type": "String" }] },
+      { "name": "appointment", "type": "Appointment", "description": "Appointment by ID", "args": [{ "name": "id", "type": "ID!" }] },
+      { "name": "myAppointments", "type": "[Appointment!]!", "description": "Current user's appointments", "args": [{ "name": "status", "type": "AppointmentStatus" }] },
+      { "name": "notaryAppointments", "type": "[Appointment!]!", "description": "Notary's appointments (notary only)", "args": [{ "name": "status", "type": "AppointmentStatus" }] },
+      { "name": "availableSlots", "type": "[TimeSlot!]!", "description": "Available slots for notary", "args": [{ "name": "notaryId", "type": "ID!" }, { "name": "startDate", "type": "Date!" }, { "name": "endDate", "type": "Date!" }] },
+      { "name": "delivery", "type": "Delivery", "description": "Delivery by order ID", "args": [{ "name": "orderId", "type": "ID!" }] },
+      { "name": "myDeliveries", "type": "[Delivery!]!", "description": "Current user's deliveries", "args": [] },
+      { "name": "services", "type": "[Service!]!", "description": "Platform services", "args": [] },
+      { "name": "faqs", "type": "[FAQ!]!", "description": "FAQs", "args": [{ "name": "category", "type": "FAQCategory" }, { "name": "search", "type": "String" }] },
+      { "name": "adminStats", "type": "AdminStats!", "description": "Admin dashboard stats (admin only)", "args": [] },
+      { "name": "pendingApplications", "type": "[NotaryApplication!]!", "description": "Pending notary applications (admin)", "args": [] },
+      { "name": "recentUsers", "type": "[User!]!", "description": "Recent users (admin)", "args": [{ "name": "limit", "type": "Int" }] },
+      { "name": "recentDocuments", "type": "[Document!]!", "description": "Recent documents (admin)", "args": [{ "name": "limit", "type": "Int" }] },
+      { "name": "recentTransactions", "type": "[Transaction!]!", "description": "Recent transactions (admin)", "args": [{ "name": "limit", "type": "Int" }] },
+      { "name": "reportRevenueByType", "type": "[ReportRevenueByType!]!", "description": "Revenue by document type (admin)", "args": [{ "name": "filter", "type": "ReportsFilter" }] },
+      { "name": "adminSettings", "type": "JSON!", "description": "Platform settings (admin)", "args": [] },
+      { "name": "pricingPlans", "type": "[PricingPlan!]!", "description": "Pricing plans (Basic, Standard, Premium)", "args": [] }
+    ],
+    "mutations": [
+      { "name": "login", "type": "AuthPayload!", "description": "Login (email/phone/OTP or Google)", "args": [{ "name": "input", "type": "LoginInput!" }] },
+      { "name": "signup", "type": "AuthPayload!", "description": "Register new user", "args": [{ "name": "input", "type": "SignupInput!" }] },
+      { "name": "sendOTP", "type": "OTPResponse!", "description": "Send OTP for login/signup", "args": [{ "name": "email", "type": "String" }, { "name": "phone", "type": "String" }] },
+      { "name": "refreshToken", "type": "AuthPayload!", "description": "Refresh access token", "args": [{ "name": "refreshToken", "type": "String!" }] },
+      { "name": "logout", "type": "Boolean!", "description": "Logout and invalidate tokens", "args": [] },
+      { "name": "forgotPassword", "type": "ForgotPasswordResponse!", "description": "Request password reset", "args": [{ "name": "input", "type": "ForgotPasswordInput!" }] },
+      { "name": "resetPassword", "type": "Boolean!", "description": "Reset password with token", "args": [{ "name": "input", "type": "ResetPasswordInput!" }] },
+      { "name": "changePassword", "type": "Boolean!", "description": "Change password (authenticated)", "args": [{ "name": "input", "type": "ChangePasswordInput!" }] },
+      { "name": "createDocument", "type": "Document!", "description": "Create or update document draft", "args": [{ "name": "input", "type": "CreateDocumentInput!" }] },
+      { "name": "saveDraft", "type": "Document!", "description": "Save document as draft", "args": [{ "name": "documentId", "type": "ID!" }] },
+      { "name": "deleteDraft", "type": "Boolean!", "description": "Delete draft", "args": [{ "name": "documentId", "type": "ID!" }] },
+      { "name": "createOrder", "type": "Order!", "description": "Create order from checkout", "args": [{ "name": "input", "type": "CheckoutInput!" }] },
+      { "name": "applyCoupon", "type": "CheckoutSummary!", "description": "Validate and apply coupon", "args": [{ "name": "documentId", "type": "ID!" }, { "name": "code", "type": "String!" }] },
+      { "name": "createAddress", "type": "Address!", "description": "Add delivery address", "args": [{ "name": "input", "type": "CreateAddressInput!" }] },
+      { "name": "updateAddress", "type": "Address!", "description": "Update delivery address", "args": [{ "name": "input", "type": "UpdateAddressInput!" }] },
+      { "name": "deleteAddress", "type": "Boolean!", "description": "Delete delivery address", "args": [{ "name": "addressId", "type": "ID!" }] },
+      { "name": "uploadDocument", "type": "Document!", "description": "Upload document for notarization", "args": [{ "name": "input", "type": "UploadDocumentInput!" }] },
+      { "name": "createPayment", "type": "Payment!", "description": "Initiate payment (Razorpay)", "args": [{ "name": "orderId", "type": "ID!" }] },
+      { "name": "confirmPayment", "type": "Payment!", "description": "Confirm payment after gateway callback", "args": [{ "name": "orderId", "type": "ID!" }, { "name": "razorpayPaymentId", "type": "String!" }] },
+      { "name": "createAppointment", "type": "Appointment!", "description": "Book video consultation", "args": [{ "name": "input", "type": "CreateAppointmentInput!" }] },
+      { "name": "acceptAppointment", "type": "Appointment!", "description": "Notary accept appointment", "args": [{ "name": "appointmentId", "type": "ID!" }] },
+      { "name": "rejectAppointment", "type": "Appointment!", "description": "Notary reject appointment", "args": [{ "name": "appointmentId", "type": "ID!" }, { "name": "reason", "type": "String" }] },
+      { "name": "cancelAppointment", "type": "Appointment!", "description": "Cancel appointment", "args": [{ "name": "appointmentId", "type": "ID!" }] },
+      { "name": "submitNotaryApplication", "type": "NotaryApplication!", "description": "Submit notary application", "args": [{ "name": "input", "type": "NotaryApplicationInput!" }] },
+      { "name": "updateNotaryAvailability", "type": "NotaryAvailability!", "description": "Update notary availability", "args": [{ "name": "input", "type": "AvailabilityInput!" }] },
+      { "name": "updateNotaryProfile", "type": "Notary!", "description": "Update notary profile", "args": [{ "name": "input", "type": "UpdateNotaryProfileInput!" }] },
+      { "name": "submitContact", "type": "ContactSubmission!", "description": "Submit contact form", "args": [{ "name": "input", "type": "ContactInput!" }] },
+      { "name": "createReview", "type": "Review!", "description": "Submit session review", "args": [{ "name": "notaryId", "type": "ID!" }, { "name": "sessionId", "type": "ID" }, { "name": "rating", "type": "Int!" }, { "name": "comment", "type": "String" }] },
+      { "name": "approveNotaryApplication", "type": "NotaryApplication!", "description": "Approve application (admin)", "args": [{ "name": "applicationId", "type": "ID!" }] },
+      { "name": "rejectNotaryApplication", "type": "NotaryApplication!", "description": "Reject application (admin)", "args": [{ "name": "applicationId", "type": "ID!" }, { "name": "reason", "type": "String" }] },
+      { "name": "updateAdminSettings", "type": "JSON!", "description": "Update platform settings (admin)", "args": [{ "name": "input", "type": "AdminSettingsInput!" }] }
+    ]
+  },
+  "scalars": [
+    { "name": "DateTime", "description": "ISO 8601 datetime" },
+    { "name": "Date", "description": "ISO 8601 date" },
+    { "name": "JSON", "description": "Arbitrary JSON" },
+    { "name": "Upload", "description": "File upload (GraphQL multipart)" }
+  ]
+}

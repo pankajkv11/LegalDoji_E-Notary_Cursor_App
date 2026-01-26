@@ -1,0 +1,16 @@
+query Services {
+  services {
+    id
+    name
+    description
+    price
+    basePrice
+    deliveryFee
+    flow
+    features
+    includes
+    popular
+    createdAt
+    updatedAt
+  }
+}

@@ -1,0 +1,617 @@
+{
+  "enums": [
+    {"name": "UserRole", "values": ["USER", "NOTARY", "ADMIN"]},
+    {"name": "UserStatus", "values": ["ACTIVE", "INACTIVE", "SUSPENDED", "PENDING_VERIFICATION"]},
+    {"name": "Permission", "values": ["DOCUMENT_READ", "DOCUMENT_CREATE", "DOCUMENT_UPDATE", "DOCUMENT_DELETE", "ORDER_READ", "ORDER_CREATE", "APPOINTMENT_READ", "APPOINTMENT_CREATE", "APPOINTMENT_MANAGE", "ADMIN_USERS", "ADMIN_SETTINGS", "ADMIN_REPORTS", "ADMIN_APPLICATIONS", "NOTARY_APPLY", "NOTARY_PROFILE", "NOTARY_AVAILABILITY", "ADDRESS_READ", "ADDRESS_CREATE", "ADDRESS_UPDATE", "ADDRESS_DELETE"]},
+    {"name": "DocumentStatus", "values": ["DRAFT", "IN_PROGRESS", "NOTARIZED", "COMPLETED", "CANCELLED"]},
+    {"name": "DocumentCategory", "values": ["PROPERTY", "PERSONAL", "BUSINESS", "LEGAL", "RENT_LEASE", "AFFIDAVITS", "MANAGING_BUSINESS"]},
+    {"name": "OrderType", "values": ["PHYSICAL_DELIVERY", "VIDEO_CONSULTATION"]},
+    {"name": "OrderStatus", "values": ["PENDING", "PAID", "PROCESSING", "NOTARIZED", "SHIPPED", "DELIVERED", "CANCELLED", "REFUNDED"]},
+    {"name": "AppointmentStatus", "values": ["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "NO_SHOW"]},
+    {"name": "DeliveryStatus", "values": ["PROCESSING", "PRINTED_PACKED", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED"]},
+    {"name": "PaymentStatus", "values": ["PENDING", "COMPLETED", "FAILED", "REFUNDED"]},
+    {"name": "PaymentMethod", "values": ["CARD", "UPI", "NET_BANKING", "WALLET"]},
+    {"name": "NotaryApplicationStatus", "values": ["PENDING", "APPROVED", "REJECTED"]},
+    {"name": "DayOfWeek", "values": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]},
+    {"name": "FAQCategory", "values": ["GENERAL", "DOCUMENTS", "NOTARIZATION", "PRICING", "DELIVERY", "ACCOUNT"]},
+    {"name": "LoginMethod", "values": ["EMAIL", "PHONE", "GOOGLE"]}
+  ],
+  "types": [
+    {"name": "User", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "email", "type": "String!"},
+      {"name": "phone", "type": "String"},
+      {"name": "name", "type": "String!"},
+      {"name": "role", "type": "UserRole!"},
+      {"name": "status", "type": "UserStatus!"},
+      {"name": "emailVerified", "type": "Boolean!"},
+      {"name": "phoneVerified", "type": "Boolean!"},
+      {"name": "permissions", "type": "[Permission!]!"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"},
+      {"name": "documents", "type": "[Document!]!", "args": [{"name": "status", "type": "DocumentStatus"}, {"name": "limit", "type": "Int"}, {"name": "offset", "type": "Int"}]},
+      {"name": "orders", "type": "[Order!]!", "args": [{"name": "status", "type": "OrderStatus"}, {"name": "limit", "type": "Int"}]},
+      {"name": "appointments", "type": "[Appointment!]!", "args": [{"name": "status", "type": "AppointmentStatus"}]},
+      {"name": "addresses", "type": "[Address!]!"}
+    ]},
+    {"name": "Role", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "name", "type": "String!"},
+      {"name": "permissions", "type": "[Permission!]!"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"}
+    ]},
+    {"name": "Notary", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "userId", "type": "ID!"},
+      {"name": "user", "type": "User!"},
+      {"name": "fullName", "type": "String!"},
+      {"name": "email", "type": "String!"},
+      {"name": "phone", "type": "String!"},
+      {"name": "photoUrl", "type": "String"},
+      {"name": "licenseNumber", "type": "String!"},
+      {"name": "barCouncilNumber", "type": "String!"},
+      {"name": "barCouncilState", "type": "String!"},
+      {"name": "enrollmentDate", "type": "Date!"},
+      {"name": "experience", "type": "Int!"},
+      {"name": "specialization", "type": "[String!]!"},
+      {"name": "languages", "type": "[String!]!"},
+      {"name": "location", "type": "String!"},
+      {"name": "consultationFee", "type": "Int!"},
+      {"name": "rating", "type": "Float!"},
+      {"name": "reviewsCount", "type": "Int!"},
+      {"name": "completedSessions", "type": "Int!"},
+      {"name": "bio", "type": "String"},
+      {"name": "isVerified", "type": "Boolean!"},
+      {"name": "verificationDate", "type": "DateTime"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"},
+      {"name": "availability", "type": "NotaryAvailability"},
+      {"name": "appointments", "type": "[Appointment!]!", "args": [{"name": "status", "type": "AppointmentStatus"}]},
+      {"name": "earnings", "type": "NotaryEarnings"},
+      {"name": "bankDetails", "type": "BankDetails"}
+    ]},
+    {"name": "Document", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "userId", "type": "ID!"},
+      {"name": "user", "type": "User!"},
+      {"name": "notaryId", "type": "ID"},
+      {"name": "notary", "type": "Notary"},
+      {"name": "orderId", "type": "ID"},
+      {"name": "order", "type": "Order"},
+      {"name": "templateId", "type": "String!"},
+      {"name": "template", "type": "DocumentTemplate"},
+      {"name": "title", "type": "String!"},
+      {"name": "category", "type": "DocumentCategory!"},
+      {"name": "status", "type": "DocumentStatus!"},
+      {"name": "formData", "type": "JSON!"},
+      {"name": "completionPercentage", "type": "Int"},
+      {"name": "currentStep", "type": "Int"},
+      {"name": "pdfUrl", "type": "String"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"}
+    ]},
+    {"name": "DocumentTemplate", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "slug", "type": "String!"},
+      {"name": "name", "type": "String!"},
+      {"name": "category", "type": "DocumentCategory!"},
+      {"name": "steps", "type": "[TemplateStep!]!"},
+      {"name": "defaultValues", "type": "JSON!"},
+      {"name": "fieldConfigs", "type": "JSON!"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"}
+    ]},
+    {"name": "TemplateStep", "fields": [
+      {"name": "id", "type": "Int!"},
+      {"name": "title", "type": "String!"},
+      {"name": "fields", "type": "[String!]!"}
+    ]},
+    {"name": "Order", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "orderNumber", "type": "String!"},
+      {"name": "userId", "type": "ID!"},
+      {"name": "user", "type": "User!"},
+      {"name": "documentId", "type": "ID"},
+      {"name": "document", "type": "Document"},
+      {"name": "appointmentId", "type": "ID"},
+      {"name": "appointment", "type": "Appointment"},
+      {"name": "type", "type": "OrderType!"},
+      {"name": "status", "type": "OrderStatus!"},
+      {"name": "basePrice", "type": "Int!"},
+      {"name": "deliveryFee", "type": "Int"},
+      {"name": "discount", "type": "Int"},
+      {"name": "totalAmount", "type": "Int!"},
+      {"name": "couponCode", "type": "String"},
+      {"name": "payment", "type": "Payment"},
+      {"name": "delivery", "type": "Delivery"},
+      {"name": "deliveryAddress", "type": "Address"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"}
+    ]},
+    {"name": "CheckoutSummary", "fields": [
+      {"name": "basePrice", "type": "Int!"},
+      {"name": "deliveryFee", "type": "Int!"},
+      {"name": "subtotal", "type": "Int!"},
+      {"name": "discount", "type": "Int!"},
+      {"name": "total", "type": "Int!"},
+      {"name": "couponApplied", "type": "Boolean!"}
+    ]},
+    {"name": "Payment", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "orderId", "type": "ID!"},
+      {"name": "order", "type": "Order!"},
+      {"name": "amount", "type": "Int!"},
+      {"name": "currency", "type": "String!"},
+      {"name": "status", "type": "PaymentStatus!"},
+      {"name": "method", "type": "PaymentMethod!"},
+      {"name": "razorpayOrderId", "type": "String"},
+      {"name": "razorpayPaymentId", "type": "String"},
+      {"name": "paidAt", "type": "DateTime"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"}
+    ]},
+    {"name": "Appointment", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "userId", "type": "ID!"},
+      {"name": "user", "type": "User!"},
+      {"name": "notaryId", "type": "ID!"},
+      {"name": "notary", "type": "Notary!"},
+      {"name": "documentType", "type": "String"},
+      {"name": "scheduledDate", "type": "Date!"},
+      {"name": "scheduledTime", "type": "String!"},
+      {"name": "status", "type": "AppointmentStatus!"},
+      {"name": "amount", "type": "Int!"},
+      {"name": "meetingLink", "type": "String"},
+      {"name": "notes", "type": "String"},
+      {"name": "orderId", "type": "ID"},
+      {"name": "order", "type": "Order"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"}
+    ]},
+    {"name": "Delivery", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "orderId", "type": "ID!"},
+      {"name": "order", "type": "Order!"},
+      {"name": "documentName", "type": "String!"},
+      {"name": "status", "type": "DeliveryStatus!"},
+      {"name": "courierPartner", "type": "String!"},
+      {"name": "trackingNumber", "type": "String!"},
+      {"name": "currentLocation", "type": "String"},
+      {"name": "expectedDelivery", "type": "Date"},
+      {"name": "stages", "type": "[DeliveryStage!]!"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"}
+    ]},
+    {"name": "DeliveryStage", "fields": [
+      {"name": "name", "type": "String!"},
+      {"name": "completed", "type": "Boolean!"},
+      {"name": "date", "type": "DateTime"}
+    ]},
+    {"name": "Address", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "userId", "type": "ID!"},
+      {"name": "label", "type": "String"},
+      {"name": "line1", "type": "String!"},
+      {"name": "line2", "type": "String"},
+      {"name": "city", "type": "String!"},
+      {"name": "state", "type": "String!"},
+      {"name": "pincode", "type": "String!"},
+      {"name": "country", "type": "String!"},
+      {"name": "isDefault", "type": "Boolean!"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"}
+    ]},
+    {"name": "TimeSlot", "fields": [
+      {"name": "date", "type": "Date!"},
+      {"name": "slots", "type": "[String!]!"}
+    ]},
+    {"name": "NotaryAvailability", "fields": [
+      {"name": "days", "type": "[DayAvailability!]!"},
+      {"name": "breakStart", "type": "String"},
+      {"name": "breakEnd", "type": "String"}
+    ]},
+    {"name": "DayAvailability", "fields": [
+      {"name": "day", "type": "DayOfWeek!"},
+      {"name": "enabled", "type": "Boolean!"},
+      {"name": "slots", "type": "[TimeRange!]!"}
+    ]},
+    {"name": "TimeRange", "fields": [
+      {"name": "start", "type": "String!"},
+      {"name": "end", "type": "String!"}
+    ]},
+    {"name": "NotaryEarnings", "fields": [
+      {"name": "todayEarnings", "type": "Int!"},
+      {"name": "weekEarnings", "type": "Int!"},
+      {"name": "monthEarnings", "type": "Int!"},
+      {"name": "totalEarnings", "type": "Int!"},
+      {"name": "pendingPayouts", "type": "Int!"}
+    ]},
+    {"name": "BankDetails", "fields": [
+      {"name": "accountHolderName", "type": "String!"},
+      {"name": "accountNumber", "type": "String!"},
+      {"name": "ifscCode", "type": "String!"},
+      {"name": "bankName", "type": "String!"},
+      {"name": "branchName", "type": "String"}
+    ]},
+    {"name": "NotaryApplication", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "applicationNumber", "type": "String!"},
+      {"name": "userId", "type": "ID"},
+      {"name": "firstName", "type": "String!"},
+      {"name": "middleName", "type": "String"},
+      {"name": "lastName", "type": "String!"},
+      {"name": "email", "type": "String!"},
+      {"name": "phone", "type": "String!"},
+      {"name": "licenseNumber", "type": "String"},
+      {"name": "barCouncilNumber", "type": "String"},
+      {"name": "experience", "type": "String"},
+      {"name": "specialization", "type": "String"},
+      {"name": "location", "type": "String"},
+      {"name": "status", "type": "NotaryApplicationStatus!"},
+      {"name": "documents", "type": "ApplicationDocuments"},
+      {"name": "appliedAt", "type": "DateTime!"},
+      {"name": "reviewedAt", "type": "DateTime"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"}
+    ]},
+    {"name": "ApplicationDocuments", "fields": [
+      {"name": "certificate", "type": "String"},
+      {"name": "idProof", "type": "String"},
+      {"name": "barCouncilCert", "type": "String"}
+    ]},
+    {"name": "Service", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "name", "type": "String!"},
+      {"name": "description", "type": "String!"},
+      {"name": "price", "type": "String!"},
+      {"name": "basePrice", "type": "Int"},
+      {"name": "deliveryFee", "type": "Int"},
+      {"name": "flow", "type": "[String!]!"},
+      {"name": "features", "type": "[String!]!"},
+      {"name": "includes", "type": "[String!]!"},
+      {"name": "popular", "type": "Boolean!"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"}
+    ]},
+    {"name": "FAQ", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "category", "type": "FAQCategory!"},
+      {"name": "question", "type": "String!"},
+      {"name": "answer", "type": "String!"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"}
+    ]},
+    {"name": "ContactSubmission", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "name", "type": "String!"},
+      {"name": "email", "type": "String!"},
+      {"name": "phone", "type": "String"},
+      {"name": "subject", "type": "String!"},
+      {"name": "message", "type": "String!"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"}
+    ]},
+    {"name": "Review", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "userId", "type": "ID!"},
+      {"name": "notaryId", "type": "ID!"},
+      {"name": "sessionId", "type": "ID"},
+      {"name": "rating", "type": "Int!"},
+      {"name": "comment", "type": "String"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"}
+    ]},
+    {"name": "PricingPlan", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "name", "type": "String!"},
+      {"name": "price", "type": "String!"},
+      {"name": "amount", "type": "Int!"},
+      {"name": "period", "type": "String"},
+      {"name": "features", "type": "[String!]!"},
+      {"name": "popular", "type": "Boolean!"},
+      {"name": "cta", "type": "String!"},
+      {"name": "createdAt", "type": "DateTime!"},
+      {"name": "updatedAt", "type": "DateTime!"},
+      {"name": "deletedAt", "type": "DateTime"}
+    ]},
+    {"name": "AdminStats", "fields": [
+      {"name": "totalUsers", "type": "Int!"},
+      {"name": "totalDocuments", "type": "Int!"},
+      {"name": "activeNotaries", "type": "Int!"},
+      {"name": "pendingApplications", "type": "Int!"},
+      {"name": "revenueMonth", "type": "Float!"},
+      {"name": "pendingOrders", "type": "Int!"},
+      {"name": "activeSessions", "type": "Int!"},
+      {"name": "supportTickets", "type": "Int!"}
+    ]},
+    {"name": "ReportRevenueByType", "fields": [
+      {"name": "type", "type": "String!"},
+      {"name": "amount", "type": "Float!"},
+      {"name": "count", "type": "Int!"},
+      {"name": "percentage", "type": "Int!"}
+    ]},
+    {"name": "Transaction", "fields": [
+      {"name": "id", "type": "ID!"},
+      {"name": "document", "type": "String!"},
+      {"name": "client", "type": "String!"},
+      {"name": "amount", "type": "Int!"},
+      {"name": "date", "type": "Date!"},
+      {"name": "time", "type": "String"},
+      {"name": "status", "type": "String!"}
+    ]},
+    {"name": "AuthPayload", "fields": [
+      {"name": "accessToken", "type": "String!"},
+      {"name": "refreshToken", "type": "String!"},
+      {"name": "expiresIn", "type": "Int!"},
+      {"name": "user", "type": "User!"}
+    ]},
+    {"name": "OTPResponse", "fields": [
+      {"name": "success", "type": "Boolean!"},
+      {"name": "message", "type": "String!"},
+      {"name": "expiresIn", "type": "Int"}
+    ]},
+    {"name": "ForgotPasswordResponse", "fields": [
+      {"name": "success", "type": "Boolean!"},
+      {"name": "message", "type": "String!"}
+    ]},
+    {"name": "PageInfo", "fields": [
+      {"name": "hasNextPage", "type": "Boolean!"},
+      {"name": "hasPreviousPage", "type": "Boolean!"},
+      {"name": "totalCount", "type": "Int!"}
+    ]},
+    {"name": "DocumentConnection", "fields": [
+      {"name": "nodes", "type": "[Document!]!"},
+      {"name": "pageInfo", "type": "PageInfo!"}
+    ]},
+    {"name": "OrderConnection", "fields": [
+      {"name": "nodes", "type": "[Order!]!"},
+      {"name": "pageInfo", "type": "PageInfo!"}
+    ]}
+  ],
+  "inputs": [
+    {"name": "LoginInput", "inputFields": [
+      {"name": "method", "type": "LoginMethod!"},
+      {"name": "email", "type": "String"},
+      {"name": "phone", "type": "String"},
+      {"name": "password", "type": "String"},
+      {"name": "otp", "type": "String"},
+      {"name": "googleIdToken", "type": "String"}
+    ]},
+    {"name": "SignupInput", "inputFields": [
+      {"name": "name", "type": "String!"},
+      {"name": "email", "type": "String!"},
+      {"name": "phone", "type": "String!"},
+      {"name": "password", "type": "String!"},
+      {"name": "otp", "type": "String"},
+      {"name": "acceptTerms", "type": "Boolean!"}
+    ]},
+    {"name": "RefreshTokenInput", "inputFields": [
+      {"name": "refreshToken", "type": "String!"}
+    ]},
+    {"name": "CreateDocumentInput", "inputFields": [
+      {"name": "templateId", "type": "String!"},
+      {"name": "title", "type": "String"},
+      {"name": "formData", "type": "JSON!"},
+      {"name": "currentStep", "type": "Int"},
+      {"name": "draftId", "type": "ID"}
+    ]},
+    {"name": "CheckoutInput", "inputFields": [
+      {"name": "documentId", "type": "ID!"},
+      {"name": "deliveryAddressId", "type": "ID!"},
+      {"name": "couponCode", "type": "String"}
+    ]},
+    {"name": "CreateAppointmentInput", "inputFields": [
+      {"name": "notaryId", "type": "ID!"},
+      {"name": "scheduledDate", "type": "Date!"},
+      {"name": "scheduledTime", "type": "String!"},
+      {"name": "documentType", "type": "String"},
+      {"name": "notes", "type": "String"}
+    ]},
+    {"name": "NotaryApplicationInput", "inputFields": [
+      {"name": "firstName", "type": "String!"},
+      {"name": "middleName", "type": "String"},
+      {"name": "lastName", "type": "String!"},
+      {"name": "email", "type": "String!"},
+      {"name": "phone", "type": "String!"},
+      {"name": "barCouncilFile", "type": "Upload!"}
+    ]},
+    {"name": "AvailabilityInput", "inputFields": [
+      {"name": "days", "type": "[DayAvailabilityInput!]!"},
+      {"name": "breakStart", "type": "String"},
+      {"name": "breakEnd", "type": "String"}
+    ]},
+    {"name": "DayAvailabilityInput", "inputFields": [
+      {"name": "day", "type": "DayOfWeek!"},
+      {"name": "enabled", "type": "Boolean!"},
+      {"name": "slots", "type": "[TimeRangeInput!]!"}
+    ]},
+    {"name": "TimeRangeInput", "inputFields": [
+      {"name": "start", "type": "String!"},
+      {"name": "end", "type": "String!"}
+    ]},
+    {"name": "UpdateNotaryProfileInput", "inputFields": [
+      {"name": "fullName", "type": "String"},
+      {"name": "phone", "type": "String"},
+      {"name": "alternatePhone", "type": "String"},
+      {"name": "address", "type": "String"},
+      {"name": "city", "type": "String"},
+      {"name": "state", "type": "String"},
+      {"name": "pincode", "type": "String"},
+      {"name": "languages", "type": "String"},
+      {"name": "consultationFee", "type": "Int"},
+      {"name": "bio", "type": "String"},
+      {"name": "accountHolderName", "type": "String"},
+      {"name": "accountNumber", "type": "String"},
+      {"name": "ifscCode", "type": "String"},
+      {"name": "bankName", "type": "String"},
+      {"name": "branchName", "type": "String"}
+    ]},
+    {"name": "ContactInput", "inputFields": [
+      {"name": "name", "type": "String!"},
+      {"name": "email", "type": "String!"},
+      {"name": "phone", "type": "String"},
+      {"name": "subject", "type": "String!"},
+      {"name": "message", "type": "String!"}
+    ]},
+    {"name": "CreateAddressInput", "inputFields": [
+      {"name": "label", "type": "String"},
+      {"name": "line1", "type": "String!"},
+      {"name": "line2", "type": "String"},
+      {"name": "city", "type": "String!"},
+      {"name": "state", "type": "String!"},
+      {"name": "pincode", "type": "String!"},
+      {"name": "country", "type": "String!"},
+      {"name": "isDefault", "type": "Boolean"}
+    ]},
+    {"name": "UpdateAddressInput", "inputFields": [
+      {"name": "addressId", "type": "ID!"},
+      {"name": "label", "type": "String"},
+      {"name": "line1", "type": "String"},
+      {"name": "line2", "type": "String"},
+      {"name": "city", "type": "String"},
+      {"name": "state", "type": "String"},
+      {"name": "pincode", "type": "String"},
+      {"name": "country", "type": "String"},
+      {"name": "isDefault", "type": "Boolean"}
+    ]},
+    {"name": "ForgotPasswordInput", "inputFields": [
+      {"name": "email", "type": "String"},
+      {"name": "phone", "type": "String"}
+    ]},
+    {"name": "ResetPasswordInput", "inputFields": [
+      {"name": "token", "type": "String!"},
+      {"name": "newPassword", "type": "String!"}
+    ]},
+    {"name": "ChangePasswordInput", "inputFields": [
+      {"name": "currentPassword", "type": "String!"},
+      {"name": "newPassword", "type": "String!"}
+    ]},
+    {"name": "UploadDocumentInput", "inputFields": [
+      {"name": "file", "type": "Upload!"},
+      {"name": "title", "type": "String"},
+      {"name": "templateId", "type": "String"}
+    ]},
+    {"name": "DocumentsFilter", "inputFields": [
+      {"name": "status", "type": "DocumentStatus"},
+      {"name": "category", "type": "DocumentCategory"},
+      {"name": "limit", "type": "Int"},
+      {"name": "offset", "type": "Int"}
+    ]},
+    {"name": "OrdersFilter", "inputFields": [
+      {"name": "status", "type": "OrderStatus"},
+      {"name": "type", "type": "OrderType"},
+      {"name": "limit", "type": "Int"},
+      {"name": "offset", "type": "Int"}
+    ]},
+    {"name": "ReportsFilter", "inputFields": [
+      {"name": "dateRange", "type": "String"},
+      {"name": "startDate", "type": "Date"},
+      {"name": "endDate", "type": "Date"}
+    ]},
+    {"name": "AdminSettingsInput", "inputFields": [
+      {"name": "siteName", "type": "String"},
+      {"name": "siteUrl", "type": "String"},
+      {"name": "supportEmail", "type": "String"},
+      {"name": "supportPhone", "type": "String"},
+      {"name": "address", "type": "String"},
+      {"name": "emailNotifications", "type": "Boolean"},
+      {"name": "smsNotifications", "type": "Boolean"},
+      {"name": "notifyOnNewUser", "type": "Boolean"},
+      {"name": "notifyOnNewDocument", "type": "Boolean"},
+      {"name": "notifyOnPayment", "type": "Boolean"},
+      {"name": "razorpayEnabled", "type": "Boolean"},
+      {"name": "razorpayKey", "type": "String"},
+      {"name": "upiEnabled", "type": "Boolean"},
+      {"name": "maxDocumentSize", "type": "Int"},
+      {"name": "allowedFormats", "type": "String"},
+      {"name": "autoDeleteDrafts", "type": "Int"},
+      {"name": "requireVerification", "type": "Boolean"},
+      {"name": "minExperience", "type": "Int"},
+      {"name": "maxSessionDuration", "type": "Int"},
+      {"name": "notaryCommission", "type": "Float"},
+      {"name": "twoFactorAuth", "type": "Boolean"},
+      {"name": "sessionTimeout", "type": "Int"},
+      {"name": "maintenanceMode", "type": "Boolean"}
+    ]}
+  ],
+  "queries": [
+    {"name": "me", "type": "User", "args": []},
+    {"name": "user", "type": "User", "args": [{"name": "id", "type": "ID!"}]},
+    {"name": "roles", "type": "[Role!]!", "args": []},
+    {"name": "role", "type": "Role", "args": [{"name": "id", "type": "ID!"}]},
+    {"name": "notary", "type": "Notary", "args": [{"name": "id", "type": "ID!"}]},
+    {"name": "notaries", "type": "[Notary!]!", "args": [{"name": "specialization", "type": "String"}, {"name": "location", "type": "String"}]},
+    {"name": "document", "type": "Document", "args": [{"name": "id", "type": "ID!"}]},
+    {"name": "myDocuments", "type": "DocumentConnection!", "args": [{"name": "filter", "type": "DocumentsFilter"}]},
+    {"name": "documentTemplates", "type": "[DocumentTemplate!]!", "args": [{"name": "category", "type": "DocumentCategory"}]},
+    {"name": "documentTemplate", "type": "DocumentTemplate", "args": [{"name": "slug", "type": "String!"}]},
+    {"name": "order", "type": "Order", "args": [{"name": "id", "type": "ID!"}]},
+    {"name": "myOrders", "type": "OrderConnection!", "args": [{"name": "filter", "type": "OrdersFilter"}]},
+    {"name": "checkoutSummary", "type": "CheckoutSummary!", "args": [{"name": "documentId", "type": "ID!"}, {"name": "couponCode", "type": "String"}]},
+    {"name": "appointment", "type": "Appointment", "args": [{"name": "id", "type": "ID!"}]},
+    {"name": "myAppointments", "type": "[Appointment!]!", "args": [{"name": "status", "type": "AppointmentStatus"}]},
+    {"name": "notaryAppointments", "type": "[Appointment!]!", "args": [{"name": "status", "type": "AppointmentStatus"}]},
+    {"name": "availableSlots", "type": "[TimeSlot!]!", "args": [{"name": "notaryId", "type": "ID!"}, {"name": "startDate", "type": "Date!"}, {"name": "endDate", "type": "Date!"}]},
+    {"name": "delivery", "type": "Delivery", "args": [{"name": "orderId", "type": "ID!"}]},
+    {"name": "myDeliveries", "type": "[Delivery!]!", "args": []},
+    {"name": "services", "type": "[Service!]!", "args": []},
+    {"name": "faqs", "type": "[FAQ!]!", "args": [{"name": "category", "type": "FAQCategory"}, {"name": "search", "type": "String"}]},
+    {"name": "pricingPlans", "type": "[PricingPlan!]!", "args": []},
+    {"name": "adminStats", "type": "AdminStats!", "args": []},
+    {"name": "pendingApplications", "type": "[NotaryApplication!]!", "args": []},
+    {"name": "recentUsers", "type": "[User!]!", "args": [{"name": "limit", "type": "Int"}]},
+    {"name": "recentDocuments", "type": "[Document!]!", "args": [{"name": "limit", "type": "Int"}]},
+    {"name": "recentTransactions", "type": "[Transaction!]!", "args": [{"name": "limit", "type": "Int"}]},
+    {"name": "reportRevenueByType", "type": "[ReportRevenueByType!]!", "args": [{"name": "filter", "type": "ReportsFilter"}]},
+    {"name": "adminSettings", "type": "JSON!", "args": []}
+  ],
+  "mutations": [
+    {"name": "signup", "type": "AuthPayload!", "args": [{"name": "input", "type": "SignupInput!"}]},
+    {"name": "login", "type": "AuthPayload!", "args": [{"name": "input", "type": "LoginInput!"}]},
+    {"name": "refreshToken", "type": "AuthPayload!", "args": [{"name": "input", "type": "RefreshTokenInput!"}]},
+    {"name": "sendOTP", "type": "OTPResponse!", "args": [{"name": "email", "type": "String"}, {"name": "phone", "type": "String"}]},
+    {"name": "logout", "type": "Boolean!", "args": []},
+    {"name": "forgotPassword", "type": "ForgotPasswordResponse!", "args": [{"name": "input", "type": "ForgotPasswordInput!"}]},
+    {"name": "resetPassword", "type": "Boolean!", "args": [{"name": "input", "type": "ResetPasswordInput!"}]},
+    {"name": "changePassword", "type": "Boolean!", "args": [{"name": "input", "type": "ChangePasswordInput!"}]},
+    {"name": "createDocument", "type": "Document!", "args": [{"name": "input", "type": "CreateDocumentInput!"}]},
+    {"name": "saveDraft", "type": "Document!", "args": [{"name": "documentId", "type": "ID!"}]},
+    {"name": "deleteDraft", "type": "Boolean!", "args": [{"name": "documentId", "type": "ID!"}]},
+    {"name": "uploadDocument", "type": "Document!", "args": [{"name": "input", "type": "UploadDocumentInput!"}]},
+    {"name": "createOrder", "type": "Order!", "args": [{"name": "input", "type": "CheckoutInput!"}]},
+    {"name": "applyCoupon", "type": "CheckoutSummary!", "args": [{"name": "documentId", "type": "ID!"}, {"name": "code", "type": "String!"}]},
+    {"name": "createPayment", "type": "Payment!", "args": [{"name": "orderId", "type": "ID!"}]},
+    {"name": "confirmPayment", "type": "Payment!", "args": [{"name": "orderId", "type": "ID!"}, {"name": "razorpayPaymentId", "type": "String!"}]},
+    {"name": "createAppointment", "type": "Appointment!", "args": [{"name": "input", "type": "CreateAppointmentInput!"}]},
+    {"name": "acceptAppointment", "type": "Appointment!", "args": [{"name": "appointmentId", "type": "ID!"}]},
+    {"name": "rejectAppointment", "type": "Appointment!", "args": [{"name": "appointmentId", "type": "ID!"}, {"name": "reason", "type": "String"}]},
+    {"name": "cancelAppointment", "type": "Appointment!", "args": [{"name": "appointmentId", "type": "ID!"}]},
+    {"name": "createAddress", "type": "Address!", "args": [{"name": "input", "type": "CreateAddressInput!"}]},
+    {"name": "updateAddress", "type": "Address!", "args": [{"name": "input", "type": "UpdateAddressInput!"}]},
+    {"name": "deleteAddress", "type": "Boolean!", "args": [{"name": "addressId", "type": "ID!"}]},
+    {"name": "submitNotaryApplication", "type": "NotaryApplication!", "args": [{"name": "input", "type": "NotaryApplicationInput!"}]},
+    {"name": "updateNotaryAvailability", "type": "NotaryAvailability!", "args": [{"name": "input", "type": "AvailabilityInput!"}]},
+    {"name": "updateNotaryProfile", "type": "Notary!", "args": [{"name": "input", "type": "UpdateNotaryProfileInput!"}]},
+    {"name": "submitContact", "type": "ContactSubmission!", "args": [{"name": "input", "type": "ContactInput!"}]},
+    {"name": "createReview", "type": "Review!", "args": [{"name": "notaryId", "type": "ID!"}, {"name": "sessionId", "type": "ID"}, {"name": "rating", "type": "Int!"}, {"name": "comment", "type": "String"}]},
+    {"name": "approveNotaryApplication", "type": "NotaryApplication!", "args": [{"name": "applicationId", "type": "ID!"}]},
+    {"name": "rejectNotaryApplication", "type": "NotaryApplication!", "args": [{"name": "applicationId", "type": "ID!"}, {"name": "reason", "type": "String"}]},
+    {"name": "updateAdminSettings", "type": "JSON!", "args": [{"name": "input", "type": "AdminSettingsInput!"}]}
+  ]
+}

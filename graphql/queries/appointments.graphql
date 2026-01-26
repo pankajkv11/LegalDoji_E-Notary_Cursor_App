@@ -1,0 +1,17 @@
+query MyAppointments($status: String) {
+  myAppointments(status: $status) {
+    id
+    userId
+    notaryId
+    documentType
+    scheduledDate
+    scheduledTime
+    status
+    meetingLink
+    notes
+    orderId
+    amount
+    createdAt
+    updatedAt
+  }
+}

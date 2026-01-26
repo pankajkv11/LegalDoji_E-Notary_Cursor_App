@@ -1,0 +1,11 @@
+mutation SubmitContact($input: ContactInput!) {
+  submitContact(input: $input) {
+    id
+    name
+    email
+    phone
+    subject
+    message
+    createdAt
+  }
+}

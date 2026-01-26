@@ -1,0 +1,32 @@
+mutation CreateDocument($input: CreateDocumentInput!) {
+  createDocument(input: $input) {
+    id
+    userId
+    templateId
+    title
+    category
+    status
+    formData
+    completionPercentage
+    currentStep
+    createdAt
+    updatedAt
+  }
+}
+
+mutation SaveDraft($documentId: String!) {
+  saveDraft(documentId: $documentId) {
+    id
+    userId
+    templateId
+    title
+    status
+    formData
+    currentStep
+    updatedAt
+  }
+}
+
+mutation DeleteDraft($documentId: String!) {
+  deleteDraft(documentId: $documentId)
+}

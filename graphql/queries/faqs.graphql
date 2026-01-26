@@ -1,0 +1,10 @@
+query FAQs($category: String, $search: String) {
+  faqs(category: $category, search: $search) {
+    id
+    category
+    question
+    answer
+    createdAt
+    updatedAt
+  }
+}
