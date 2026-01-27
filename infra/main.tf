@@ -103,7 +103,7 @@ output "ec2_public_ip" {
 
 
 locals {
-  rds_exists = can(aws_db_instance.newsdb[0])
-  rds_endpoint = try(aws_db_instance.newsdb[0].address, "")
-  rds_username = try(aws_db_instance.newsdb[0].username, "")
+  rds_exists = can(aws_db_instance.legaldb[0])
+  rds_endpoint = try(aws_db_instance.legaldb[0].address, "")
+  rds_username = try(aws_db_instance.legaldb[0].username, "")
 }

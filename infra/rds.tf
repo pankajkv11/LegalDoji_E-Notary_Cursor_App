@@ -1,5 +1,5 @@
 # Create RDS only if explicitly asked
-resource "aws_db_instance" "newsdb" {
+resource "aws_db_instance" "legaldb" {
   count                = var.enable_rds ? 1 : 0
   allocated_storage    = 20
   engine               = "postgres"
