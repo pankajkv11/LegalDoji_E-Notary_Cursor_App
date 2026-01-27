@@ -73,7 +73,7 @@ sudo -u appuser tee .env.local <<EOF
 NEXT_PUBLIC_API_URL="https://api.shivdarshan.space/graphql"
 EOF
 sudo -u appuser npm install
-sudo -u appuser npm run build
+# sudo -u appuser npm run build
 # Install pm2 globally and run Next.js with pm2
 sudo npm install -g pm2
 sudo -u appuser pm2 start npm --name legal-frontend -- run start
