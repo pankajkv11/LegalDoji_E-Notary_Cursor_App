@@ -6,11 +6,38 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import AsyncSessionLocal
 from app.models.document import DocumentTemplate
 from app.models.content import Service, FAQ, PricingPlan
-from app.models.enums import DocumentCategory, FAQCategory
+from app.models.user import User
+from app.models.enums import DocumentCategory, FAQCategory, UserRole, UserStatus
+from app.core.security import hash_password
 
 
 async def seed_data(session: AsyncSession):
     """Seed initial data into the database."""
+    
+    # Seed Admin User
+    admin_email = "admin@legaldoji.com"
+    admin_password = "Admin@123"  # Default admin password
+    
+    existing_admin = await session.execute(
+        select(User).where(
+            User.email == admin_email,
+            User.deleted_at.is_(None)
+        )
+    )
+    if not existing_admin.scalar_one_or_none():
+        admin_user = User(
+            id=str(uuid.uuid4()),
+            email=admin_email,
+            phone="+911234567890",
+            name="Admin User",
+            hashed_password=hash_password(admin_password),
+            role=UserRole.ADMIN,
+            status=UserStatus.ACTIVE,
+            email_verified=True,
+            phone_verified=True,
+        )
+        session.add(admin_user)
+        print(f"✅ Admin user created: {admin_email} / {admin_password}")
     
     # Seed Document Templates
     templates = [

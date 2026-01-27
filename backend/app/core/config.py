@@ -1,6 +1,17 @@
 """Application configuration."""
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from dotenv import load_dotenv
+import os
+
+load_dotenv()  # Load environment variables from .env file
+
+# Debug: print all loaded env vars from .env
+print("Loaded environment variables:")
+for k, v in os.environ.items():
+    if k.isupper() and k in ["database_url", "database_url_sync"]:
+        print(f"{k}={v}")
+
 
 
 class Settings(BaseSettings):
@@ -31,6 +42,8 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3001",
         "http://127.0.0.1:3002",
         "http://127.0.0.1:3003",
+        "https://shivdarshan.space",
+        "https://www.shivdarshan.space",
     ]
 
     class Config:

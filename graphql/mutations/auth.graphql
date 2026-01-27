@@ -1,5 +1,17 @@
 mutation Signup($input: SignupInput!) {
   signup(input: $input) {
+    success
+    message
+    tempToken
+    expiresIn
+    userId
+    email
+    phone
+  }
+}
+
+mutation VerifyOtp($input: VerifyOtpInput!) {
+  verifyOtp(input: $input) {
     accessToken
     refreshToken
     expiresIn
@@ -14,6 +26,18 @@ mutation Signup($input: SignupInput!) {
       phoneVerified
       permissions
     }
+  }
+}
+
+mutation ResendOtp($tempToken: String!) {
+  resendOtp(tempToken: $tempToken) {
+    success
+    message
+    tempToken
+    expiresIn
+    userId
+    email
+    phone
   }
 }
 

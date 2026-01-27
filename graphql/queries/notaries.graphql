@@ -43,3 +43,70 @@ query Notaries($specialization: String, $location: String) {
     createdAt
   }
 }
+
+# Admin query to fetch all notary applications
+query NotaryApplications($status: String, $limit: Int, $offset: Int) {
+  notaryApplications(status: $status, limit: $limit, offset: $offset) {
+    id
+    applicationNumber
+    userId
+    firstName
+    middleName
+    lastName
+    email
+    phone
+    licenseNumber
+    barCouncilNumber
+    experience
+    specialization
+    location
+    status
+    appliedAt
+    reviewedAt
+    createdAt
+    updatedAt
+  }
+}
+
+# Admin query to fetch a specific application
+query NotaryApplication($id: String!) {
+  notaryApplication(id: $id) {
+    id
+    applicationNumber
+    userId
+    firstName
+    middleName
+    lastName
+    email
+    phone
+    licenseNumber
+    barCouncilNumber
+    experience
+    specialization
+    location
+    status
+    appliedAt
+    reviewedAt
+    createdAt
+    updatedAt
+  }
+}
+
+# User query to check their own application status
+query MyNotaryApplication {
+  myNotaryApplication {
+    id
+    applicationNumber
+    userId
+    firstName
+    middleName
+    lastName
+    email
+    phone
+    status
+    appliedAt
+    reviewedAt
+    createdAt
+    updatedAt
+  }
+}
