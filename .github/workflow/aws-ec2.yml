@@ -1,0 +1,337 @@
+name: CI/CD AWS EC2 Deploy
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  backend-unit-test-build:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Backend - Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Backend - Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Backend - Run unit tests
+        run: pytest -q
+
+      - name: Upload source for next jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-code
+          path: .
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Frontend - Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Frontend - Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Frontend - Lint and type check
+        run: |
+          cd frontend
+          npm run lint || true
+          npm run type-check || true
+
+
+  plan:
+    needs: [backend-unit-test-build, frontend-build]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Download source
+        uses: actions/download-artifact@v4
+        with:
+          name: source-code
+          path: .
+
+      - name: Plan - Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Plan - Terraform Init
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ap-south-1
+          TF_VAR_environment: production
+          TF_VAR_public_key: ${{ secrets.PUBLIC_KEY }}
+          TF_VAR_key_name: ec2-key
+          TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_aws_region: ap-south-1
+          TF_VAR_s3_bucket: pp-backend-bucket
+          TF_VAR_rds_password: ${{ secrets.RDS_PASSWORD }}
+        run: terraform init
+        working-directory: infra
+
+      - name: Plan - Debug Environment
+        run: env | sort
+
+      - name: Plan - Terraform Plan
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ap-south-1
+          TF_VAR_environment: production
+          TF_VAR_public_key: ${{ secrets.PUBLIC_KEY }}
+          TF_VAR_key_name: ec2-key
+          TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_aws_region: ap-south-1
+          TF_VAR_s3_bucket: pp-backend-bucket
+          TF_VAR_rds_password: ${{ secrets.RDS_PASSWORD }}
+        run: |
+          terraform plan -out=tfplan \
+            -var aws_access_key_id=$AWS_ACCESS_KEY_ID \
+            -var aws_secret_access_key=$AWS_SECRET_ACCESS_KEY \
+            -var aws_region=ap-south-1 \
+            -var public_key="${{ secrets.PUBLIC_KEY }}"
+          terraform show -json tfplan > plan.json
+          terraform output -json > outputs.json
+        working-directory: infra
+
+      - name: Plan - Show Terraform Outputs
+        run: cat infra/outputs.json
+
+      - name: Upload Terraform Outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: tf-outputs
+          path: infra/outputs.json
+
+  destroy:
+    if: github.event_name == 'push'
+    needs: plan
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download source
+        uses: actions/download-artifact@v4
+        with:
+          name: source-code
+          path: .
+
+      - name: Destroy - Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Destroy - Terraform Init
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ap-south-1
+          TF_VAR_environment: production
+          TF_VAR_public_key: ${{ secrets.PUBLIC_KEY }}
+          TF_VAR_key_name: ec2-key
+          TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_aws_region: ap-south-1
+          TF_VAR_s3_bucket: pp-backend-bucket
+          TF_VAR_rds_password: ${{ secrets.RDS_PASSWORD }}
+        run: terraform init
+        working-directory: infra
+
+      - name: Destroy - Terraform Destroy (EC2 & Security Group Only)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ap-south-1
+          TF_VAR_environment: production
+          TF_VAR_public_key: ${{ secrets.PUBLIC_KEY }}
+          TF_VAR_key_name: ec2-key
+          TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_aws_region: ap-south-1
+          TF_VAR_s3_bucket: pp-backend-bucket
+          TF_VAR_rds_password: ${{ secrets.RDS_PASSWORD }}
+        run: |
+          terraform destroy -auto-approve \
+            -target=aws_instance.app_server \
+            -target=aws_key_pair.deployer \
+            || echo "Safe destroy"
+        working-directory: infra
+
+
+
+  deploy:
+    needs: destroy
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Download source
+        uses: actions/download-artifact@v4
+        with:
+          name: source-code
+          path: .
+      - name: Download Terraform Outputs
+        uses: actions/download-artifact@v4
+        with:
+          name: tf-outputs
+          path: infra
+
+      - name: Deploy - Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Deploy - Terraform Init
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ap-south-1
+          TF_VAR_environment: production
+          TF_VAR_public_key: ${{ secrets.PUBLIC_KEY }}
+          TF_VAR_key_name: ec2-key
+          TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_aws_region: ap-south-1
+          TF_VAR_s3_bucket: pp-backend-bucket
+          TF_VAR_rds_password: ${{ secrets.RDS_PASSWORD }}
+        run: terraform init
+        working-directory: infra
+
+      - name: Pre-Deploy - Terraform Init
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ap-south-1
+          TF_VAR_environment: production
+          TF_VAR_public_key: ${{ secrets.PUBLIC_KEY }}
+          TF_VAR_key_name: ec2-key
+          TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_aws_region: ap-south-1
+          TF_VAR_s3_bucket: pp-backend-bucket
+          TF_VAR_rds_password: ${{ secrets.RDS_PASSWORD }}
+        run: terraform init
+        working-directory: infra
+
+      - name: Deploy - Terraform Apply
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ap-south-1
+          TF_VAR_environment: production
+          TF_VAR_public_key: ${{ secrets.PUBLIC_KEY }}
+          TF_VAR_key_name: ec2-key
+          TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_aws_region: ap-south-1
+          TF_VAR_s3_bucket: pp-backend-bucket
+          TF_VAR_rds_password: ${{ secrets.RDS_PASSWORD }}
+        run: |
+          terraform apply -auto-approve \
+            -var aws_access_key_id=$AWS_ACCESS_KEY_ID \
+            -var aws_secret_access_key=$AWS_SECRET_ACCESS_KEY \
+            -var aws_region=ap-south-1 \
+            -var public_key="${{ secrets.PUBLIC_KEY }}"
+        working-directory: infra
+
+      - name: Deploy - Export RDS and App Env Vars
+        id: env
+        run: |
+          export RDS_ENDPOINT=$(jq -r '.rds_endpoint.value // empty' infra/outputs.json)
+          export RDS_USERNAME=$(jq -r '.rds_username.value // empty' infra/outputs.json)
+          export RDS_PASSWORD=$(jq -r '.rds_password.value // empty' infra/outputs.json)
+          echo "RDS_ENDPOINT=$RDS_ENDPOINT" >> $GITHUB_ENV
+          echo "RDS_USERNAME=$RDS_USERNAME" >> $GITHUB_ENV
+          echo "RDS_PASSWORD=$RDS_PASSWORD" >> $GITHUB_ENV
+          echo "DATABASE_URL=postgresql://$RDS_USERNAME:$RDS_PASSWORD@$RDS_ENDPOINT:5432/newsdb" >> $GITHUB_ENV
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> $GITHUB_ENV
+          echo "ALGORITHM=HS256" >> $GITHUB_ENV
+          echo "ACCESS_TOKEN_EXPIRE_MINUTES=30" >> $GITHUB_ENV
+          echo "REFRESH_TOKEN_EXPIRE_DAYS=7" >> $GITHUB_ENV
+          echo "REDIS_URL=redis://localhost:6379" >> $GITHUB_ENV
+          echo "CORS_ORIGINS=*" >> $GITHUB_ENV
+          echo "ADMIN_ENABLED=true" >> $GITHUB_ENV
+
+      # --- EC2 SSH Key Management ---
+      # 1. Generate a key pair named $TF_VAR_environment-$TF_VAR_key_name (e.g., production-ec2-key) locally:
+      #    ssh-keygen -t rsa -b 4096 -f "$TF_VAR_environment-$TF_VAR_key_name" -N ""
+      # 2. Set the public key as the GitHub secret PUBLIC_KEY (for TF_VAR_public_key)
+      # 3. Set the private key as the GitHub secret EC2_SSH_PRIVATE_KEY
+      # 4. Terraform will use the public key for EC2, and the workflow will use the private key for scp/ssh
+
+
+  cleanup:
+    if: failure()
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Download source
+        uses: actions/download-artifact@v4
+        with:
+          name: source-code
+          path: .
+
+      - name: Cleanup - Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Cleanup - Terraform Init
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ap-south-1
+          TF_VAR_environment: production
+          TF_VAR_public_key: ${{ secrets.PUBLIC_KEY }}
+          TF_VAR_key_name: ec2-key
+          TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_aws_region: ap-south-1
+          TF_VAR_s3_bucket: pp-backend-bucket
+          TF_VAR_rds_password: ${{ secrets.RDS_PASSWORD }}
+        run: terraform init
+        working-directory: infra
+
+      - name: Cleanup - Terraform Destroy
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ap-south-1
+          TF_VAR_environment: production
+          TF_VAR_public_key: ${{ secrets.PUBLIC_KEY }}
+          TF_VAR_key_name: ec2-key
+          TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_aws_region: ap-south-1
+          TF_VAR_s3_bucket: pp-backend-bucket
+          TF_VAR_rds_password: ${{ secrets.RDS_PASSWORD }}
+        run: |
+          terraform destroy -auto-approve \
+            -var aws_access_key_id=$AWS_ACCESS_KEY_ID \
+            -var aws_secret_access_key=$AWS_SECRET_ACCESS_KEY \
+            -var aws_region=ap-south-1 \
+            -var public_key="${{ secrets.PUBLIC_KEY }}"
+        working-directory: infra
