@@ -235,6 +235,18 @@ class OTPResponseType:
 
 
 @strawberry.type
+class SignupResponseType:
+    """Response from initial signup - returns temp token for OTP verification"""
+    success: bool
+    message: str
+    temp_token: str
+    expires_in: int  # seconds until temp token expires
+    user_id: str
+    email: str
+    phone: Optional[str] = None
+
+
+@strawberry.type
 class ForgotPasswordResponseType:
     success: bool
     message: str

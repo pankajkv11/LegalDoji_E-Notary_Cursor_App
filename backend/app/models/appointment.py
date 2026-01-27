@@ -5,7 +5,6 @@ import uuid
 from datetime import date
 
 from sqlalchemy import String, Integer, ForeignKey, Enum, Date
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, SoftDeleteMixin
@@ -16,16 +15,16 @@ class Appointment(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "appointments"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     user_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("users.id"), nullable=False, index=True
+        String(36), ForeignKey("users.id"), nullable=False, index=True
     )
     notary_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("notaries.id"), nullable=False, index=True
+        String(36), ForeignKey("notaries.id"), nullable=False, index=True
     )
     order_id: Mapped[str | None] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("orders.id"), nullable=True, index=True
+        String(36), ForeignKey("orders.id"), nullable=True, index=True
     )
     document_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
     scheduled_date: Mapped[date] = mapped_column(Date, nullable=False)

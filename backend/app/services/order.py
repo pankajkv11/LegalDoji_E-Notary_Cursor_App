@@ -72,5 +72,4 @@ class OrderService:
         )
         self.session.add(pay)
         await self.session.flush()
-        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return pay

@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 from typing import Generic, TypeVar, Type
 
-from sqlalchemy import select, func, cast, String
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.base import Base
@@ -16,9 +16,7 @@ class BaseRepository(Generic[ModelT]):
         self.model = model
 
     async def get(self, id: str) -> ModelT | None:
-        # Cast id column to String to match VARCHAR type in database
-        # This handles the case where the DB column is VARCHAR but model uses UUID(as_uuid=False)
-        q = select(self.model).where(cast(self.model.id, String) == id)
+        q = select(self.model).where(self.model.id == id)
         if hasattr(self.model, "deleted_at"):
             q = q.where(self.model.deleted_at.is_(None))
         result = await self.session.execute(q)
@@ -43,8 +41,6 @@ class BaseRepository(Generic[ModelT]):
     async def add(self, entity: ModelT) -> ModelT:
         self.session.add(entity)
         await self.session.flush()
-        # Don't refresh - it causes type mismatch errors with UUID(as_uuid=False) and VARCHAR columns
-        # The entity already has all the values we need after flush
         return entity
 
     async def delete_soft(self, entity: ModelT) -> None:

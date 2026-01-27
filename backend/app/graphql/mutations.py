@@ -22,6 +22,7 @@ from app.graphql.types import (
     ContactSubmissionType,
     NotaryAvailabilityType,
     ReviewType,
+    SignupResponseType,
 )
 from app.graphql.inputs import (
     LoginInput,
@@ -40,6 +41,7 @@ from app.graphql.inputs import (
     UpdateNotaryProfileInput,
     ContactInput,
     AdminSettingsInput,
+    VerifyOtpInput,
 )
 from app.graphql.resolvers.helpers import (
     user_to_gql,
@@ -74,11 +76,15 @@ def _app_number() -> str:
 @strawberry.type
 class Mutation:
     @strawberry.mutation
-    async def signup(self, info: strawberry.types.Info, input: SignupInput) -> AuthPayloadType:
+    async def signup(self, info: strawberry.types.Info, input: SignupInput) -> SignupResponseType:
+        """
+        Register a new user. Creates account with PENDING_VERIFICATION status.
+        Returns a temp_token for OTP verification.
+        """
         ctx: Context = info.context
         svc = AuthService(ctx.session)
         try:
-            user, access, refresh, expires = await svc.signup(
+            result = await svc.signup(
                 name=input.name,
                 email=input.email,
                 phone=input.phone,
@@ -92,6 +98,38 @@ class Mutation:
             # Wrap other exceptions in ValueError for consistent error handling
             raise ValueError(f"Signup failed: {str(e)}")
         
+        return SignupResponseType(
+            success=result["success"],
+            message=result["message"],
+            temp_token=result["temp_token"],
+            expires_in=result["expires_in"],
+            user_id=result["user_id"],
+            email=result["email"],
+            phone=result["phone"],
+        )
+
+    @strawberry.mutation
+    async def verify_otp(self, info: strawberry.types.Info, input: VerifyOtpInput) -> AuthPayloadType:
+        """
+        Verify OTP and activate user account.
+        Returns auth tokens on successful verification.
+        """
+        ctx: Context = info.context
+        svc = AuthService(ctx.session)
+        try:
+            result = await svc.verify_otp(
+                temp_token=input.temp_token,
+                otp=input.otp,
+            )
+        except ValueError as e:
+            raise ValueError(str(e))
+        except Exception as e:
+            raise ValueError(f"OTP verification failed: {str(e)}")
+        
+        if not result:
+            raise ValueError("OTP verification failed")
+        
+        user, access, refresh, expires = result
         usvc = UserService(ctx.session)
         perms = usvc.permissions_for_user(user)
         return AuthPayloadType(
@@ -99,6 +137,35 @@ class Mutation:
             refresh_token=refresh,
             expires_in=expires,
             user=user_to_gql(user, perms),
+        )
+
+    @strawberry.mutation
+    async def resend_otp(self, info: strawberry.types.Info, temp_token: str) -> SignupResponseType:
+        """
+        Resend OTP for verification.
+        Returns a new temp token with extended expiry.
+        """
+        ctx: Context = info.context
+        svc = AuthService(ctx.session)
+        try:
+            result = await svc.resend_otp(temp_token=temp_token)
+        except ValueError as e:
+            raise ValueError(str(e))
+        except Exception as e:
+            raise ValueError(f"Failed to resend OTP: {str(e)}")
+        
+        # Decode the new token to get user info
+        from app.services.auth import decode_verification_token
+        token_data = decode_verification_token(result["new_token"])
+        
+        return SignupResponseType(
+            success=result["success"],
+            message=result["message"],
+            temp_token=result["new_token"],
+            expires_in=result["expires_in"],
+            user_id=token_data["sub"] if token_data else "",
+            email=token_data["email"] if token_data else "",
+            phone=token_data["phone"] if token_data else "",
         )
 
     @strawberry.mutation
@@ -271,7 +338,6 @@ class Mutation:
         )
         ctx.session.add(apt)
         await ctx.session.flush()
-        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return appointment_to_gql(apt)
 
     @strawberry.mutation
@@ -295,7 +361,6 @@ class Mutation:
         )
         ctx.session.add(addr)
         await ctx.session.flush()
-        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return address_to_gql(addr)
 
     @strawberry.mutation
@@ -327,7 +392,6 @@ class Mutation:
         if input.is_default is not None:
             a.is_default = input.is_default
         await ctx.session.flush()
-        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return address_to_gql(a)
 
     @strawberry.mutation
@@ -407,7 +471,6 @@ class Mutation:
         )
         ctx.session.add(app)
         await ctx.session.flush()
-        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return NotaryApplicationType(
             id=app.id,
             application_number=app.application_number,
@@ -454,7 +517,6 @@ class Mutation:
         pay.status = PaymentStatus.COMPLETED
         pay.paid_at = datetime.now(timezone.utc)
         await ctx.session.flush()
-        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return payment_to_gql(pay)
 
     @strawberry.mutation
@@ -474,7 +536,6 @@ class Mutation:
             raise ValueError("Appointment not found")
         apt.status = AppointmentStatus.CONFIRMED
         await ctx.session.flush()
-        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return appointment_to_gql(apt)
 
     @strawberry.mutation
@@ -501,7 +562,6 @@ class Mutation:
         if reason:
             apt.notes = (apt.notes or "") + f"\nRejected: {reason}"
         await ctx.session.flush()
-        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return appointment_to_gql(apt)
 
     @strawberry.mutation
@@ -516,7 +576,6 @@ class Mutation:
             raise ValueError("Appointment not found")
         apt.status = AppointmentStatus.CANCELLED
         await ctx.session.flush()
-        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return appointment_to_gql(apt)
 
     @strawberry.mutation
@@ -546,7 +605,6 @@ class Mutation:
             avail.break_start = input.break_start
             avail.break_end = input.break_end
         await ctx.session.flush()
-        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return NotaryAvailabilityType(days=avail.days, break_start=avail.break_start, break_end=avail.break_end)
 
     @strawberry.mutation
@@ -581,7 +639,6 @@ class Mutation:
         if input.branch_name is not None:
             n.bank_branch = input.branch_name
         await ctx.session.flush()
-        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return notary_to_gql(n)
 
     @strawberry.mutation
@@ -597,7 +654,6 @@ class Mutation:
         )
         ctx.session.add(c)
         await ctx.session.flush()
-        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return contact_to_gql(c)
 
     @strawberry.mutation
@@ -615,7 +671,6 @@ class Mutation:
         r = Review(user_id=user.id, notary_id=notary_id, session_id=session_id, rating=rating, comment=comment)
         ctx.session.add(r)
         await ctx.session.flush()
-        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return ReviewType(
             id=r.id,
             user_id=r.user_id,
@@ -648,7 +703,6 @@ class Mutation:
         app.status = NotaryApplicationStatus.APPROVED
         app.reviewed_at = datetime.now(timezone.utc)
         await ctx.session.flush()
-        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return NotaryApplicationType(
             id=app.id,
             application_number=app.application_number,
@@ -693,7 +747,6 @@ class Mutation:
         if reason:
             app.documents = {**(app.documents or {}), "reject_reason": reason}
         await ctx.session.flush()
-        # Don't refresh - causes type mismatch with UUID(as_uuid=False) and VARCHAR columns
         return NotaryApplicationType(
             id=app.id,
             application_number=app.application_number,
