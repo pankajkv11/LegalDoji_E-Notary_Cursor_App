@@ -14,3 +14,7 @@ starlette-admin>=0.16
 aiosqlite>=0.19
 greenlet>=3.0
 argon2_cffi
+# Testing
+pytest>=7.4
+pytest-asyncio>=0.23
+httpx>=0.26
