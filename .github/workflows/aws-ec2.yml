@@ -265,13 +265,6 @@ jobs:
           echo "RDS_USERNAME=$RDS_USERNAME" >> $GITHUB_ENV
           echo "RDS_PASSWORD=$RDS_PASSWORD" >> $GITHUB_ENV
           echo "DATABASE_URL=postgresql://$RDS_USERNAME:$RDS_PASSWORD@$RDS_ENDPOINT:5432/newsdb" >> $GITHUB_ENV
-          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> $GITHUB_ENV
-          echo "ALGORITHM=HS256" >> $GITHUB_ENV
-          echo "ACCESS_TOKEN_EXPIRE_MINUTES=30" >> $GITHUB_ENV
-          echo "REFRESH_TOKEN_EXPIRE_DAYS=7" >> $GITHUB_ENV
-          echo "REDIS_URL=redis://localhost:6379" >> $GITHUB_ENV
-          echo "CORS_ORIGINS=*" >> $GITHUB_ENV
-          echo "ADMIN_ENABLED=true" >> $GITHUB_ENV
 
       # --- EC2 SSH Key Management ---
       # 1. Generate a key pair named $TF_VAR_environment-$TF_VAR_key_name (e.g., production-ec2-key) locally:

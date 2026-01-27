@@ -80,10 +80,6 @@ resource "aws_instance" "app_server" {
     rds_username = local.rds_username
     rds_password = var.rds_password
     rds_db_name  = var.rds_db_name
-    secret_key   = var.secret_key
-    database_url = var.database_url
-    redis_url    = var.redis_url
-    cors_origins = var.cors_origins
   })
 
   tags = {
