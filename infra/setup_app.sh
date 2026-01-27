@@ -7,7 +7,7 @@ sudo apt-get install -y python3-pip python3-venv git postgresql postgresql-contr
 
 echo "Initial setup: provisioning system and dependencies."
 sudo useradd -m appuser || true
-sudo -u appuser git clone https://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@github.com/pankajkv11/LegalDoji_Claud_App_v.1.0.git /home/appuser/app || true
+sudo -u appuser git clone https://github.com/pankajkv11/LegalDoji_Claud_App_v.1.0.git /home/appuser/app || true
 cd /home/appuser/app/backend
 # If .env still does not exist (local/dev/first boot), create a default one
 cat <<EOF >/home/appuser/app/backend/.env
