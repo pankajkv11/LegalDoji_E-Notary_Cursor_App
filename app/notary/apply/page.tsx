@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Upload, CheckCircle, FileText, User, Mail, Phone, File, Loader2, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Upload, CheckCircle, FileText, User, Mail, Phone, File, Loader2, AlertCircle, Lock, Eye, EyeOff } from 'lucide-react'
 import { useSubmitNotaryApplicationMutation } from '@/graphql/generated/hooks'
 
 export default function NotaryApplicationPage() {
@@ -12,8 +12,12 @@ export default function NotaryApplicationPage() {
     lastName: '',
     email: '',
     phone: '',
+    password: '',
+    confirmPassword: '',
     barCouncilFile: null as File | null
   })
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -41,13 +45,36 @@ export default function NotaryApplicationPage() {
     e.preventDefault()
     setError(null)
 
+    // Validate required fields
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone) {
+      setError('Please fill in all required fields')
+      return
+    }
+
+    if (!formData.password) {
+      setError('Please enter a password')
+      return
+    }
+
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters long')
+      return
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+
     if (!formData.barCouncilFile) {
       setError('Please upload your bar council certificate')
       return
     }
 
+    console.log('Submitting application...', formData)
+
     try {
-      await submitApplication({
+      const result = await submitApplication({
         variables: {
           input: {
             firstName: formData.firstName,
@@ -55,12 +82,14 @@ export default function NotaryApplicationPage() {
             lastName: formData.lastName,
             email: formData.email,
             phone: formData.phone,
-            barCouncilFile: formData.barCouncilFile as any // File upload type
+            barCouncilFile: formData.barCouncilFile.name // Send file name as placeholder
           }
         }
       })
-    } catch (err) {
-      // Error handled by onError callback
+      console.log('Submission result:', result)
+    } catch (err: any) {
+      console.error('Submission error:', err)
+      setError(err.message || 'An unexpected error occurred')
     }
   }
 
@@ -254,6 +283,59 @@ export default function NotaryApplicationPage() {
               <p className="text-xs text-gray-500 mt-1">Include country code</p>
             </div>
 
+            {/* Password Fields */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password *
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Min. 8 characters"
+                    className="w-full pl-10 pr-12 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Minimum 8 characters</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Confirm Password *
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    required
+                    value={formData.confirmPassword}
+                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                    placeholder="Re-enter password"
+                    className="w-full pl-10 pr-12 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Must match password above</p>
+              </div>
+            </div>
+
             {/* File Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -286,7 +368,6 @@ export default function NotaryApplicationPage() {
                   </div>
                   <input
                     type="file"
-                    required
                     accept=".pdf,.jpg,.jpeg,.png"
                     onChange={handleFileChange}
                     className="hidden"
@@ -314,6 +395,17 @@ export default function NotaryApplicationPage() {
                 </Link>
               </label>
             </div>
+
+            {/* Error Display */}
+            {error && (
+              <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-red-900">Error</p>
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              </div>
+            )}
 
             {/* Submit Button */}
             <div className="flex gap-4 pt-2">

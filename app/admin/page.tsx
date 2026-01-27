@@ -7,67 +7,62 @@ import {
   UserCheck, Clock, CheckCircle, AlertTriangle, Search,
   Filter, Download, Eye, Edit, Trash2, BarChart3, Shield,
   Calendar, Mail, Phone, MapPin, Building2, CreditCard,
-  XCircle, CheckCircle2, FileCheck, Award, Briefcase
+  XCircle, CheckCircle2, FileCheck, Award, Briefcase, Loader2
 } from 'lucide-react'
+import {
+  useNotaryApplicationsQuery,
+  useApproveNotaryApplicationMutation,
+  useRejectNotaryApplicationMutation,
+} from '@/graphql/generated/hooks'
 
 export default function AdminPage() {
-  // Pending Notary/Advocate Applications
-  const [pendingApplications, setPendingApplications] = useState([
-    {
-      id: 'APP-001',
-      name: 'Kavita Menon',
-      email: 'kavita.m@email.com',
-      phone: '+91 98765 43214',
-      licenseNumber: 'KL-NOT-2024-012',
-      barCouncilNumber: 'BAR/KL/2020/1234',
-      experience: '5 years',
-      specialization: 'Property & Real Estate Law',
-      location: 'Kochi, Kerala',
-      documents: {
-        certificate: 'notary_certificate.pdf',
-        idProof: 'aadhar_card.pdf',
-        barCouncilCert: 'bar_council_cert.pdf'
-      },
-      appliedDate: '2024-01-22',
-      status: 'pending'
+  // Fetch pending notary applications from GraphQL
+  const { data: applicationsData, loading: applicationsLoading, error: applicationsError, refetch: refetchApplications } = useNotaryApplicationsQuery({
+    variables: { status: 'PENDING' },
+    errorPolicy: 'all',
+  })
+
+  const [approveApplication, { loading: approving }] = useApproveNotaryApplicationMutation({
+    onCompleted: () => {
+      refetchApplications()
     },
-    {
-      id: 'APP-002',
-      name: 'Arjun Malhotra',
-      email: 'arjun.malhotra@email.com',
-      phone: '+91 98765 43215',
-      licenseNumber: 'UP-NOT-2024-089',
-      barCouncilNumber: 'BAR/UP/2019/5678',
-      experience: '8 years',
-      specialization: 'Corporate & Business Law',
-      location: 'Noida, UP',
-      documents: {
-        certificate: 'notary_certificate.pdf',
-        idProof: 'passport.pdf',
-        barCouncilCert: 'bar_council_cert.pdf'
-      },
-      appliedDate: '2024-01-23',
-      status: 'pending'
+    onError: (error) => {
+      alert(`Failed to approve: ${error.message}`)
     },
-    {
-      id: 'APP-003',
-      name: 'Neha Deshmukh',
-      email: 'neha.d@email.com',
-      phone: '+91 98765 43216',
-      licenseNumber: 'MH-NOT-2024-045',
-      barCouncilNumber: 'BAR/MH/2021/9012',
-      experience: '3 years',
-      specialization: 'Family & Matrimonial Law',
-      location: 'Pune, Maharashtra',
-      documents: {
-        certificate: 'notary_certificate.pdf',
-        idProof: 'aadhar_card.pdf',
-        barCouncilCert: 'bar_council_cert.pdf'
-      },
-      appliedDate: '2024-01-23',
-      status: 'pending'
-    }
-  ])
+  })
+
+  const [rejectApplication, { loading: rejecting }] = useRejectNotaryApplicationMutation({
+    onCompleted: () => {
+      refetchApplications()
+    },
+    onError: (error) => {
+      alert(`Failed to reject: ${error.message}`)
+    },
+  })
+
+  // Transform GraphQL data to component format (handle potential errors gracefully)
+  const pendingApplications = applicationsData?.notaryApplications?.map(app => ({
+    id: app.applicationNumber,
+    dbId: app.id,
+    name: `${app.firstName}${app.middleName ? ' ' + app.middleName : ''} ${app.lastName}`,
+    email: app.email,
+    phone: app.phone,
+    licenseNumber: app.licenseNumber || 'Not provided',
+    barCouncilNumber: app.barCouncilNumber || 'Not provided',
+    experience: app.experience || 'Not provided',
+    specialization: app.specialization || 'Not specified',
+    location: app.location || 'Not specified',
+    documents: {
+      certificate: 'notary_certificate.pdf',
+      idProof: 'id_proof.pdf',
+      barCouncilCert: 'bar_council_cert.pdf'
+    },
+    appliedDate: app.appliedAt ? new Date(app.appliedAt).toISOString().split('T')[0] : 'N/A',
+    status: app.status?.toLowerCase() || 'pending'
+  })) || []
+
+  // Show auth error message if query fails due to permission
+  const authError = applicationsError?.message?.includes('Admin only') || applicationsError?.message?.includes('Authentication')
 
   // Admin Statistics
   const adminStats = [
@@ -128,17 +123,30 @@ export default function AdminPage() {
   }
 
   // Handler functions for application actions
-  const handleApproveApplication = (applicationId: string) => {
+  const handleApproveApplication = async (applicationId: string, dbId: string) => {
     if (confirm('Are you sure you want to approve this application?')) {
-      setPendingApplications(prev => prev.filter(app => app.id !== applicationId))
-      alert(`Application ${applicationId} approved successfully!`)
+      try {
+        await approveApplication({
+          variables: { applicationId: dbId },
+        })
+        alert(`Application ${applicationId} approved successfully!`)
+      } catch (error) {
+        // Error handled by onError callback
+      }
     }
   }
 
-  const handleRejectApplication = (applicationId: string) => {
+  const handleRejectApplication = async (applicationId: string, dbId: string) => {
+    const reason = prompt('Please provide a reason for rejection (optional):')
     if (confirm('Are you sure you want to reject this application?')) {
-      setPendingApplications(prev => prev.filter(app => app.id !== applicationId))
-      alert(`Application ${applicationId} rejected.`)
+      try {
+        await rejectApplication({
+          variables: { applicationId: dbId, reason: reason || undefined },
+        })
+        alert(`Application ${applicationId} rejected.`)
+      } catch (error) {
+        // Error handled by onError callback
+      }
     }
   }
 
@@ -148,6 +156,38 @@ export default function AdminPage() {
 
   const handleViewProfile = (applicationId: string) => {
     alert(`Opening full profile for ${applicationId}...`)
+  }
+
+  // Show login prompt if authentication error
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-2xl border-2 border-gray-200 p-8 max-w-md w-full mx-4 text-center">
+          <div className="bg-red-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Shield className="h-10 w-10 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Admin Access Required</h2>
+          <p className="text-gray-600 mb-6">
+            You need to be logged in as an administrator to access this page.
+          </p>
+          <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+            <h3 className="font-semibold text-gray-900 mb-2">Admin Credentials:</h3>
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">Email:</span> admin@legaldoji.com
+            </p>
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">Password:</span> Admin@123
+            </p>
+          </div>
+          <Link
+            href="/login"
+            className="block w-full bg-gray-900 text-white hover:bg-gray-800 px-6 py-3 rounded-lg font-semibold text-center transition-all"
+          >
+            Go to Login
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -398,17 +438,19 @@ export default function AdminPage() {
                       View Full Profile
                     </button>
                     <button
-                      onClick={() => handleRejectApplication(application.id)}
-                      className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors shadow-lg"
+                      onClick={() => handleRejectApplication(application.id, application.dbId)}
+                      disabled={rejecting}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors shadow-lg disabled:opacity-50"
                     >
-                      <XCircle className="h-5 w-5" />
+                      {rejecting ? <Loader2 className="h-5 w-5 animate-spin" /> : <XCircle className="h-5 w-5" />}
                       Reject Application
                     </button>
                     <button
-                      onClick={() => handleApproveApplication(application.id)}
-                      className="flex-1 bg-gray-900 hover:bg-black text-white px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors shadow-lg"
+                      onClick={() => handleApproveApplication(application.id, application.dbId)}
+                      disabled={approving}
+                      className="flex-1 bg-gray-900 hover:bg-black text-white px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors shadow-lg disabled:opacity-50"
                     >
-                      <CheckCircle2 className="h-5 w-5" />
+                      {approving ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />}
                       Approve & Activate
                     </button>
                   </div>
@@ -416,7 +458,14 @@ export default function AdminPage() {
               ))}
             </div>
 
-            {pendingApplications.length === 0 && (
+            {applicationsLoading && (
+              <div className="text-center py-12">
+                <Loader2 className="h-16 w-16 text-gray-400 mx-auto mb-4 animate-spin" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Applications...</h3>
+              </div>
+            )}
+
+            {!applicationsLoading && pendingApplications.length === 0 && (
               <div className="text-center py-12">
                 <CheckCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">No Pending Applications</h3>

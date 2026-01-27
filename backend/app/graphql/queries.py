@@ -26,6 +26,7 @@ from app.graphql.types import (
     PageInfoType,
     DocumentConnectionType,
     TimeSlotType,
+    NotaryApplicationType,
 )
 from app.graphql.inputs import DocumentsFilterInput, OrdersFilterInput, ReportsFilterInput
 from app.graphql.resolvers.helpers import (
@@ -380,4 +381,147 @@ class Query:
             pending_orders=orders_c or 0,
             active_sessions=0,
             support_tickets=0,
+        )
+
+    @strawberry.field
+    async def notary_applications(
+        self,
+        info: strawberry.types.Info,
+        status: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[NotaryApplicationType]:
+        """Get all notary applications (Admin only)."""
+        ctx: Context = info.context
+        user = ctx.require_user()
+        if user.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        from app.models.notary import NotaryApplication
+        q = select(NotaryApplication).where(NotaryApplication.deleted_at.is_(None))
+        if status:
+            q = q.where(NotaryApplication.status == NotaryApplicationStatus(status))
+        q = q.order_by(desc(NotaryApplication.applied_at)).limit(limit).offset(offset)
+        result = await ctx.session.execute(q)
+        apps = result.scalars().all()
+        return [
+            NotaryApplicationType(
+                id=a.id,
+                application_number=a.application_number,
+                user_id=a.user_id,
+                first_name=a.first_name,
+                middle_name=a.middle_name,
+                last_name=a.last_name,
+                email=a.email,
+                phone=a.phone,
+                license_number=a.license_number,
+                bar_council_number=a.bar_council_number,
+                experience=a.experience,
+                specialization=a.specialization,
+                location=a.location,
+                status=a.status.value,
+                applied_at=a.applied_at,
+                reviewed_at=a.reviewed_at,
+                created_at=a.created_at,
+                updated_at=a.updated_at,
+                deleted_at=a.deleted_at,
+            )
+            for a in apps
+        ]
+
+    @strawberry.field
+    async def my_notary_application(
+        self,
+        info: strawberry.types.Info,
+    ) -> Optional[NotaryApplicationType]:
+        """Get current user's notary application status."""
+        ctx: Context = info.context
+        user = ctx.require_user()
+        from app.models.notary import NotaryApplication
+        result = await ctx.session.execute(
+            select(NotaryApplication)
+            .where(
+                NotaryApplication.user_id == str(user.id),
+                NotaryApplication.deleted_at.is_(None),
+            )
+            .order_by(desc(NotaryApplication.applied_at))
+            .limit(1)
+        )
+        a = result.scalar_one_or_none()
+        if not a:
+            # Also check by email for applications submitted without login
+            result = await ctx.session.execute(
+                select(NotaryApplication)
+                .where(
+                    NotaryApplication.email == user.email,
+                    NotaryApplication.deleted_at.is_(None),
+                )
+                .order_by(desc(NotaryApplication.applied_at))
+                .limit(1)
+            )
+            a = result.scalar_one_or_none()
+        if not a:
+            return None
+        return NotaryApplicationType(
+            id=a.id,
+            application_number=a.application_number,
+            user_id=a.user_id,
+            first_name=a.first_name,
+            middle_name=a.middle_name,
+            last_name=a.last_name,
+            email=a.email,
+            phone=a.phone,
+            license_number=a.license_number,
+            bar_council_number=a.bar_council_number,
+            experience=a.experience,
+            specialization=a.specialization,
+            location=a.location,
+            status=a.status.value,
+            applied_at=a.applied_at,
+            reviewed_at=a.reviewed_at,
+            created_at=a.created_at,
+            updated_at=a.updated_at,
+            deleted_at=a.deleted_at,
+        )
+
+    @strawberry.field
+    async def notary_application(
+        self,
+        info: strawberry.types.Info,
+        id: str,
+    ) -> Optional[NotaryApplicationType]:
+        """Get a specific notary application by ID (Admin only)."""
+        ctx: Context = info.context
+        user = ctx.require_user()
+        if user.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        from app.models.notary import NotaryApplication
+        result = await ctx.session.execute(
+            select(NotaryApplication).where(
+                cast(NotaryApplication.id, String) == id,
+                NotaryApplication.deleted_at.is_(None),
+            )
+        )
+        a = result.scalar_one_or_none()
+        if not a:
+            return None
+        return NotaryApplicationType(
+            id=a.id,
+            application_number=a.application_number,
+            user_id=a.user_id,
+            first_name=a.first_name,
+            middle_name=a.middle_name,
+            last_name=a.last_name,
+            email=a.email,
+            phone=a.phone,
+            license_number=a.license_number,
+            bar_council_number=a.bar_council_number,
+            experience=a.experience,
+            specialization=a.specialization,
+            location=a.location,
+            status=a.status.value,
+            applied_at=a.applied_at,
+            reviewed_at=a.reviewed_at,
+            created_at=a.created_at,
+            updated_at=a.updated_at,
+            deleted_at=a.deleted_at,
         )

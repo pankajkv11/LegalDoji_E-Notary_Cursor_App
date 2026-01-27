@@ -12,3 +12,35 @@ mutation SubmitNotaryApplication($input: NotaryApplicationInput!) {
     appliedAt
   }
 }
+
+# Admin mutation to approve a notary application
+mutation ApproveNotaryApplication($applicationId: String!) {
+  approveNotaryApplication(applicationId: $applicationId) {
+    id
+    applicationNumber
+    firstName
+    middleName
+    lastName
+    email
+    phone
+    status
+    appliedAt
+    reviewedAt
+  }
+}
+
+# Admin mutation to reject a notary application
+mutation RejectNotaryApplication($applicationId: String!, $reason: String) {
+  rejectNotaryApplication(applicationId: $applicationId, reason: $reason) {
+    id
+    applicationNumber
+    firstName
+    middleName
+    lastName
+    email
+    phone
+    status
+    appliedAt
+    reviewedAt
+  }
+}

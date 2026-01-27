@@ -25,6 +25,12 @@ class SignupInput:
 
 
 @strawberry.input
+class VerifyOtpInput:
+    temp_token: str
+    otp: str
+
+
+@strawberry.input
 class RefreshTokenInput:
     refresh_token: str
 
