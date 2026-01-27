@@ -3,7 +3,12 @@
 set -e
 # Update and install dependencies
 sudo apt-get update -y
-sudo apt-get install -y python3-pip python3-venv git postgresql postgresql-contrib nginx
+sudo apt-get install -y software-properties-common git postgresql postgresql-contrib nginx
+
+# Add deadsnakes PPA and install Python 3.11
+sudo add-apt-repository -y ppa:deadsnakes/ppa
+sudo apt-get update -y
+sudo apt-get install -y python3.11 python3.11-venv python3.11-dev
 
 echo "Initial setup: provisioning system and dependencies."
 sudo useradd -m appuser || true
@@ -14,7 +19,7 @@ cat <<EOF >/home/appuser/app/backend/.env
 database_url=postgresql+asyncpg://${rds_username}:${rds_password}@${rds_endpoint}:5432/${rds_db_name}
 database_url_sync=postgresql://${rds_username}:${rds_password}@${rds_endpoint}:5432/${rds_db_name}
 EOF
-sudo -u appuser python3 -m venv venv
+sudo -u appuser python3.11 -m venv venv
 sudo -u appuser venv/bin/pip install --upgrade pip
 sudo -u appuser venv/bin/pip install -r requirements.txt
 
