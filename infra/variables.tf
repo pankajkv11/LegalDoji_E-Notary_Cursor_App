@@ -1,7 +1,7 @@
 variable "route53_zone_id" {
 	description = "Route53 Hosted Zone ID for peoplepolly.com."
 	type        = string
-	default		= "Z0023181XPA9OI3U6RAU"
+	default		= "Z012050233W92UBVT70TJ"
 }
 variable "create_rds" {
 	description = "Whether to create a new RDS instance. Set to false to use an existing one."
