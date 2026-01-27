@@ -1,12 +1,20 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { FileText, Video, ChevronRight, CheckCircle, ArrowRight, Loader2 } from 'lucide-react'
-import { useServicesQuery } from '@/graphql/generated/hooks'
+import { useServicesQuery, useMeQuery } from '@/graphql/generated/hooks'
+import { getAccessToken } from '@/lib/auth'
 
 export default function ServicesPage() {
+  const router = useRouter()
   const { data, loading, error } = useServicesQuery()
+  const { data: userData, loading: userLoading } = useMeQuery({
+    errorPolicy: 'ignore' // Don't throw error if not authenticated
+  })
+  
+  const isAuthenticated = !!userData?.me || !!getAccessToken()
 
   // Map GraphQL services to component format
   const services = React.useMemo(() => {
@@ -181,9 +189,28 @@ export default function ServicesPage() {
                       </ul>
                     </div>
 
-                    {/* CTA Button - direct to create/consultation, no login gate */}
-                    <Link
-                      href={service.id === 'video-consultation' ? '/consultation' : '/create'}
+                    {/* CTA Button - redirect based on auth status */}
+                    <button
+                      onClick={() => {
+                        if (isAuthenticated) {
+                          // Logged in: redirect to dashboard immediately
+                          router.push('/dashboard')
+                        } else {
+                          // Not logged in: go to service flow
+                          // Use name-based check to identify video consultation service
+                          const isVideoConsultation = service.name.toLowerCase().includes('video') || 
+                                                      service.name.toLowerCase().includes('consultation') ||
+                                                      service.name.toLowerCase().includes('notarization')
+                          
+                          if (isVideoConsultation) {
+                            // Show appointment page to schedule video consultation
+                            router.push('/consultation')
+                          } else {
+                            // Show categories page to select document
+                            router.push('/create')
+                          }
+                        }
+                      }}
                       className={`block w-full py-4 px-6 rounded-lg font-semibold text-center transition-all transform hover:scale-105 ${
                         service.popular
                           ? 'bg-gray-900 text-white hover:bg-black shadow-lg'
@@ -191,7 +218,7 @@ export default function ServicesPage() {
                       }`}
                     >
                       {service.cta}
-                    </Link>
+                    </button>
                   </div>
                 </div>
               )

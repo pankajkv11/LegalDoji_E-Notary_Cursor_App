@@ -8,13 +8,21 @@ import {
   useCheckoutSummaryQuery, 
   useApplyCouponMutation, 
   useCreateOrderMutation,
-  useDocumentQuery 
+  useDocumentQuery,
+  useMeQuery
 } from '@/graphql/generated/hooks'
+import { getAccessToken } from '@/lib/auth'
 
 export default function CreateCheckoutPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const documentId = searchParams.get('documentId')
+  
+  // Check authentication
+  const { data: userData, loading: userLoading } = useMeQuery({
+    errorPolicy: 'ignore'
+  })
+  const isAuthenticated = !!userData?.me || !!getAccessToken()
   
   const [couponCode, setCouponCode] = useState('')
   const [couponApplied, setCouponApplied] = useState(false)
@@ -59,8 +67,15 @@ export default function CreateCheckoutPage() {
   useEffect(() => {
     if (!documentId) {
       router.replace('/create')
+      return
     }
-  }, [documentId, router])
+    
+    // Redirect to login if not authenticated, preserving documentId
+    if (!userLoading && !isAuthenticated) {
+      const redirectUrl = `/create/checkout?documentId=${documentId}`
+      router.push(`/login?redirect=${encodeURIComponent(redirectUrl)}`)
+    }
+  }, [documentId, router, userLoading, isAuthenticated])
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim() || !documentId) return
@@ -95,7 +110,7 @@ export default function CreateCheckoutPage() {
   const summary = checkoutData?.checkoutSummary
   const document = documentData?.document
 
-  if (documentLoading || checkoutLoading || !documentId) {
+  if (documentLoading || checkoutLoading || userLoading || !documentId || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -254,20 +269,40 @@ export default function CreateCheckoutPage() {
             )}
 
             <div className="flex gap-4 mt-8 pt-6 border-t border-gray-200">
-              <button
-                onClick={handlePay}
-                disabled={creatingOrder}
-                className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
-              >
-                {creatingOrder ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  `Pay ₹${summary.total}`
-                )}
-              </button>
+              {!isAuthenticated ? (
+                <div className="w-full bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                  <p className="text-yellow-800 mb-3">Please sign in to complete your purchase</p>
+                  <div className="flex gap-3">
+                    <Link
+                      href={`/login?redirect=${encodeURIComponent(`/create/checkout?documentId=${documentId}`)}`}
+                      className="flex-1 bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors text-center"
+                    >
+                      Sign In
+                    </Link>
+                    <Link
+                      href={`/signup?redirect=${encodeURIComponent(`/create/checkout?documentId=${documentId}`)}`}
+                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-900 px-6 py-2 rounded-lg font-semibold transition-colors text-center"
+                    >
+                      Sign Up
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handlePay}
+                  disabled={creatingOrder}
+                  className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                >
+                  {creatingOrder ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    `Pay ₹${summary.total}`
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

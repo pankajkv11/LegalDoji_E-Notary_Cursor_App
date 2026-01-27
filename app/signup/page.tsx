@@ -2,13 +2,15 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Mail, Phone, User, Lock, Eye, EyeOff, Chrome, CheckCircle, Loader2, AlertCircle } from 'lucide-react'
 import { useSignupMutation, useSendOtpMutation } from '@/graphql/generated/hooks'
 import { setAuthTokens } from '@/lib/auth'
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirect') || '/dashboard'
   const [showPassword, setShowPassword] = useState(false)
   const [step, setStep] = useState<'info' | 'otp' | 'password'>('info')
   const [error, setError] = useState<string | null>(null)
@@ -30,7 +32,9 @@ export default function SignupPage() {
           data.signup.refreshToken,
           data.signup.user
         )
-        router.push('/dashboard')
+        // Redirect to the intended destination or dashboard
+        const target = redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`
+        router.push(target)
       }
     },
     onError: (err) => {
