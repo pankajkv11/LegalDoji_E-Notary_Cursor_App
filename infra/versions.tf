@@ -1,7 +1,7 @@
 terraform {
   backend "s3" {
-    bucket  = "pp-backend-bucket"
-    key     = "pp-backend/terraform.tfstate"
+    bucket  = "legal-backend-bucket"
+    key     = "legal-backend/terraform.tfstate"
     region  = "ap-south-1"
     encrypt = true
   }
