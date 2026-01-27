@@ -6,7 +6,7 @@ resource "aws_db_instance" "newsdb" {
   engine_version       = "15"
   instance_class       = "db.t3.micro"
   db_name              = var.rds_db_name
-  identifier           = "${var.environment}-legalDB"
+  identifier           = "${var.environment}-legaldb"
   username             = var.rds_username
   password             = var.rds_password
   parameter_group_name = "default.postgres15"
