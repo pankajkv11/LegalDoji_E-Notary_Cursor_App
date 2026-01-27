@@ -1,14 +1,23 @@
 #!/bin/bash
 # setup_app.sh: EC2 user-data script for FastAPI app and PostgreSQL
 set -e
-# Update and install dependencies
+
+# Wait for cloud-init to complete
+cloud-init status --wait || true
+
+# Update and install base dependencies
+export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update -y
-sudo apt-get install -y software-properties-common git postgresql postgresql-contrib nginx
+sudo apt-get install -y software-properties-common git postgresql postgresql-contrib nginx curl
 
 # Add deadsnakes PPA and install Python 3.11
+echo "Adding deadsnakes PPA for Python 3.11..."
 sudo add-apt-repository -y ppa:deadsnakes/ppa
 sudo apt-get update -y
-sudo apt-get install -y python3.11 python3.11-venv python3.11-dev
+sudo apt-get install -y python3.11 python3.11-venv python3.11-dev python3.11-distutils
+
+# Verify Python 3.11 installation
+python3.11 --version || { echo "Python 3.11 installation failed"; exit 1; }
 
 echo "Initial setup: provisioning system and dependencies."
 sudo useradd -m appuser || true
