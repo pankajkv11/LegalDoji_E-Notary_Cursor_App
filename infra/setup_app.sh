@@ -2,11 +2,14 @@
 # setup_app.sh: EC2 user-data script for FastAPI app and PostgreSQL
 set -e
 
-# Wait for cloud-init to complete
-cloud-init status --wait || true
-
 # Update and install base dependencies
 export DEBIAN_FRONTEND=noninteractive
+
+# Wait for apt locks to be released (in case of concurrent apt processes)
+while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+    echo "Waiting for apt lock..."
+    sleep 5
+done
 sudo apt-get update -y
 sudo apt-get install -y software-properties-common git postgresql postgresql-contrib nginx curl
 
