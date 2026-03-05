@@ -5,7 +5,7 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import String, Integer, Float, Boolean, ForeignKey, Enum, Text, Date, DateTime, func
-from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, SoftDeleteMixin
@@ -16,10 +16,10 @@ class Notary(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "notaries"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     user_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("users.id"), nullable=False, unique=True, index=True
+        String(36), ForeignKey("users.id"), nullable=False, unique=True, index=True
     )
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
@@ -65,10 +65,10 @@ class NotaryAvailability(Base, TimestampMixin):
     __tablename__ = "notary_availability"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     notary_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("notaries.id"), nullable=False, unique=True
+        String(36), ForeignKey("notaries.id"), nullable=False, unique=True
     )
     days: Mapped[dict] = mapped_column(JSONB, nullable=False, default=list)
     break_start: Mapped[str | None] = mapped_column(String(8), nullable=True)
@@ -83,13 +83,13 @@ class NotaryApplication(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "notary_applications"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     application_number: Mapped[str] = mapped_column(
         String(32), unique=True, nullable=False, index=True
     )
     user_id: Mapped[str | None] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("users.id"), nullable=True, index=True
+        String(36), ForeignKey("users.id"), nullable=True, index=True
     )
     first_name: Mapped[str] = mapped_column(String(128), nullable=False)
     middle_name: Mapped[str | None] = mapped_column(String(128), nullable=True)

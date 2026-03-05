@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pkill:*)",
+      "Bash(export PATH=\"/opt/homebrew/opt/postgresql@16/bin:$PATH\")",
+      "Bash(.venv/bin/python3:*)"
+    ]
+  }
+}

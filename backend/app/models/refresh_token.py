@@ -5,7 +5,6 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import String, Boolean, ForeignKey, DateTime, func
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -15,10 +14,10 @@ class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     user_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"),
+        String(36), ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False, index=True
     )
     token: Mapped[str] = mapped_column(String(512), unique=True, nullable=False, index=True)

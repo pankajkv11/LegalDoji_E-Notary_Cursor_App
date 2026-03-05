@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Save, HelpCircle, Eye, FileText, CheckCircle, MessageCircle } from 'lucide-react'
+import { ArrowLeft, Save, HelpCircle, Eye, EyeOff, FileText, CheckCircle, MessageCircle, X, Mail, Lock } from 'lucide-react'
 import {
   documentTemplates,
   documentCategories,
@@ -12,6 +12,7 @@ import {
   saveCreateDraft,
   type CreateDraft,
 } from '@/lib/document-templates'
+import { getUser, saveUser, saveToken } from '@/lib/auth'
 import { getFieldConfig } from '@/lib/document-fields'
 
 function CreateDocumentContent() {
@@ -23,6 +24,12 @@ function CreateDocumentContent() {
   const [autoSaved, setAutoSaved] = useState(false)
   const [draftSaved, setDraftSaved] = useState(false)
   const [formData, setFormData] = useState<Record<string, string>>({})
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginError, setLoginError] = useState<string | null>(null)
+  const [loginLoading, setLoginLoading] = useState(false)
+  const [showLoginPassword, setShowLoginPassword] = useState(false)
 
   const templateFromUrl = searchParams.get('template')
 
@@ -89,7 +96,49 @@ function CreateDocumentContent() {
     const draft = buildDraft()
     if (!draft) return
     saveCreateDraft(draft)
+    const user = getUser()
+    if (!user) {
+      setShowLoginModal(true)
+      return
+    }
     router.push('/create/checkout')
+  }
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoginError(null)
+    setLoginLoading(true)
+    try {
+      const res = await fetch(
+        process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1/graphql',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: `mutation Login($email: String!, $password: String!) {
+              login(input: { method: "EMAIL", email: $email, password: $password }) {
+                accessToken
+                user { id name email phone role }
+              }
+            }`,
+            variables: { email: loginEmail, password: loginPassword },
+          }),
+        }
+      )
+      const json = await res.json()
+      if (json.errors?.length) { setLoginError(json.errors[0].message); return }
+      const payload = json.data?.login
+      if (!payload) { setLoginError('Invalid email or password.'); return }
+      const roleMap: Record<string, 'user' | 'notary' | 'admin'> = { USER: 'user', NOTARY: 'notary', ADMIN: 'admin' }
+      saveToken(payload.accessToken)
+      saveUser({ name: payload.user.name, email: payload.user.email, phone: payload.user.phone ?? '', role: roleMap[payload.user.role] ?? 'user' })
+      setShowLoginModal(false)
+      router.push('/create/checkout')
+    } catch {
+      setLoginError('Network error. Please check your connection.')
+    } finally {
+      setLoginLoading(false)
+    }
   }
 
   // Render field based on configuration
@@ -510,6 +559,79 @@ function CreateDocumentContent() {
           </div>
         </div>
       </div>
+      )}
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8 relative">
+            <button
+              onClick={() => setShowLoginModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Sign in to continue</h2>
+              <p className="text-sm text-gray-500 mt-1">Your document progress is saved. Sign in to proceed to checkout.</p>
+            </div>
+            {loginError && (
+              <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
+                {loginError}
+              </div>
+            )}
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type="email"
+                    required
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type={showLoginPassword ? 'text' : 'password'}
+                    required
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showLoginPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={loginLoading}
+                className="w-full bg-primary-600 hover:bg-primary-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold transition-colors"
+              >
+                {loginLoading ? 'Signing in...' : 'Sign In & Continue to Checkout'}
+              </button>
+            </form>
+            <p className="mt-4 text-center text-sm text-gray-600">
+              Don&apos;t have an account?{' '}
+              <Link href="/signup" className="text-primary-600 hover:text-primary-700 font-semibold">
+                Sign up
+              </Link>
+            </p>
+          </div>
+        </div>
       )}
     </div>
   )

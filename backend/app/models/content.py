@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import String, Integer, Text, ForeignKey, Enum
-from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, SoftDeleteMixin
@@ -15,7 +15,7 @@ class Service(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "services"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
@@ -35,7 +35,7 @@ class FAQ(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "faqs"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     category: Mapped[str] = mapped_column(Enum(FAQCategory), nullable=False)
     question: Mapped[str] = mapped_column(Text, nullable=False)
@@ -49,7 +49,7 @@ class ContactSubmission(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "contact_submissions"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -65,16 +65,16 @@ class Review(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "reviews"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     user_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("users.id"), nullable=False, index=True
+        String(36), ForeignKey("users.id"), nullable=False, index=True
     )
     notary_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("notaries.id"), nullable=False, index=True
+        String(36), ForeignKey("notaries.id"), nullable=False, index=True
     )
     session_id: Mapped[str | None] = mapped_column(
-        UUID(as_uuid=False), nullable=True, index=True
+        String(36), nullable=True, index=True
     )
     rating: Mapped[int] = mapped_column(Integer, nullable=False)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -87,7 +87,7 @@ class PricingPlan(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "pricing_plans"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     price: Mapped[str] = mapped_column(String(32), nullable=False)

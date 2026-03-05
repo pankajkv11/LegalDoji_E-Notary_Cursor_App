@@ -5,7 +5,7 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import String, Integer, ForeignKey, Enum, DateTime, Date
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, SoftDeleteMixin
@@ -16,22 +16,22 @@ class Order(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "orders"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     order_number: Mapped[str] = mapped_column(
         String(32), unique=True, nullable=False, index=True
     )
     user_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("users.id"), nullable=False, index=True
+        String(36), ForeignKey("users.id"), nullable=False, index=True
     )
     document_id: Mapped[str | None] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("documents.id"), nullable=True, index=True
+        String(36), ForeignKey("documents.id"), nullable=True, index=True
     )
     appointment_id: Mapped[str | None] = mapped_column(
-        UUID(as_uuid=False), nullable=True, index=True
+        String(36), nullable=True, index=True
     )
     delivery_address_id: Mapped[str | None] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("addresses.id"), nullable=True, index=True
+        String(36), ForeignKey("addresses.id"), nullable=True, index=True
     )
     type: Mapped[str] = mapped_column(Enum(OrderType), nullable=False)
     status: Mapped[str] = mapped_column(
@@ -72,10 +72,10 @@ class Payment(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "payments"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     order_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("orders.id"), nullable=False, index=True
+        String(36), ForeignKey("orders.id"), nullable=False, index=True
     )
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False, default="INR")
@@ -99,10 +99,10 @@ class Delivery(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "deliveries"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     order_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("orders.id"), nullable=False, index=True
+        String(36), ForeignKey("orders.id"), nullable=False, index=True
     )
     document_name: Mapped[str] = mapped_column(String(512), nullable=False)
     status: Mapped[str] = mapped_column(

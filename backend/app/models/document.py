@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import String, Integer, ForeignKey, Enum, Text
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, SoftDeleteMixin
@@ -16,7 +16,7 @@ class DocumentTemplate(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "document_templates"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     slug: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -35,19 +35,19 @@ class Document(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "documents"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     user_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("users.id"), nullable=False, index=True
+        String(36), ForeignKey("users.id"), nullable=False, index=True
     )
     notary_id: Mapped[str | None] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("notaries.id"), nullable=True, index=True
+        String(36), ForeignKey("notaries.id"), nullable=True, index=True
     )
     order_id: Mapped[str | None] = mapped_column(
-        UUID(as_uuid=False), nullable=True, index=True
+        String(36), nullable=True, index=True
     )
     template_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("document_templates.id"), nullable=False, index=True
+        String(36), ForeignKey("document_templates.id"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(512), nullable=False)
     category: Mapped[str] = mapped_column(

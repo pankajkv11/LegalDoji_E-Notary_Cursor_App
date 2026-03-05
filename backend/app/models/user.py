@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, String, Text, ForeignKey, Enum
-from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, SoftDeleteMixin
@@ -16,7 +16,7 @@ class Role(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "roles"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     permissions: Mapped[list] = mapped_column(ARRAY(Text), nullable=False, default=list)
@@ -29,7 +29,7 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
@@ -44,7 +44,7 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
     email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     phone_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     role_id: Mapped[str | None] = mapped_column(
-        UUID(as_uuid=False), ForeignKey("roles.id"), nullable=True
+        String(36), ForeignKey("roles.id"), nullable=True
     )
 
     role_obj: Mapped["Role | None"] = relationship("Role", backref="users", lazy="joined")
