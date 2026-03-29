@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -12,8 +12,11 @@ import {
   MapPin,
   User,
   CheckCircle,
+  Loader2,
 } from 'lucide-react'
 import { saveConsultationDraft } from '@/lib/consultation'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1/graphql'
 
 interface Advocate {
   id: string
@@ -34,7 +37,7 @@ interface TimeSlot {
   slots: string[]
 }
 
-const ADVOCATES: Advocate[] = [
+const FALLBACK_ADVOCATES: Advocate[] = [
   {
     id: '1',
     name: 'Adv. Rajesh Kumar',
@@ -89,11 +92,13 @@ const ADVOCATES: Advocate[] = [
   },
 ]
 
-const SLOTS: TimeSlot[] = [
-  { date: '2024-01-26', slots: ['09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM'] },
-  { date: '2024-01-27', slots: ['09:00 AM', '10:00 AM', '11:00 AM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM'] },
-  { date: '2024-01-28', slots: ['10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM'] },
-]
+function getNextNDates(n: number): string[] {
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() + i + 1)
+    return d.toISOString().split('T')[0]
+  })
+}
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-IN', {
@@ -106,12 +111,96 @@ function formatDate(dateStr: string) {
 
 export default function ConsultationPage() {
   const router = useRouter()
+  const [advocates, setAdvocates] = useState<Advocate[]>(FALLBACK_ADVOCATES)
+  const [loadingAdvocates, setLoadingAdvocates] = useState(true)
+  const [slots, setSlots] = useState<TimeSlot[]>([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
   const [selectedAdvocate, setSelectedAdvocate] = useState<Advocate | null>(null)
   const [selectedDate, setSelectedDate] = useState('')
   const [selectedTime, setSelectedTime] = useState('')
 
+  // Fetch notaries from backend; fall back to static list on error
+  useEffect(() => {
+    fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `query {
+          notaries {
+            id fullName experience specialization languages location consultationFee rating reviewsCount bio
+          }
+        }`,
+      }),
+    })
+      .then((r) => r.json())
+      .then((json) => {
+        const items: Advocate[] = (json.data?.notaries ?? []).map((n: {
+          id: string; fullName: string; experience: number; specialization: string[];
+          languages: string[]; location: string; consultationFee: number;
+          rating: number; reviewsCount: number; bio?: string;
+        }) => ({
+          id: n.id,
+          name: n.fullName,
+          rating: n.rating,
+          reviews: n.reviewsCount,
+          experience: n.experience,
+          specialization: n.specialization,
+          languages: n.languages ?? [],
+          location: n.location,
+          fee: n.consultationFee,
+          availability: 'Available Today',
+          bio: n.bio ?? '',
+        }))
+        if (items.length > 0) setAdvocates(items)
+      })
+      .catch(() => { /* keep fallback */ })
+      .finally(() => setLoadingAdvocates(false))
+  }, [])
+
+  // Fetch available slots when an advocate is selected
+  useEffect(() => {
+    if (!selectedAdvocate) { setSlots([]); return }
+    const dates = getNextNDates(5)
+    const startDate = dates[0]
+    const endDate = dates[dates.length - 1]
+    setLoadingSlots(true)
+    setSlots([])
+    fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `query AvailSlots($notaryId: String!, $start: String!, $end: String!) {
+          availableSlots(notaryId: $notaryId, startDate: $start, endDate: $end) {
+            date slots
+          }
+        }`,
+        variables: { notaryId: selectedAdvocate.id, start: startDate, end: endDate },
+      }),
+    })
+      .then((r) => r.json())
+      .then((json) => {
+        const raw: { date: string; slots: string[] }[] = json.data?.availableSlots ?? []
+        if (raw.length > 0) {
+          setSlots(raw.map((s) => ({ date: String(s.date), slots: s.slots })))
+        } else {
+          // Fallback: generate static slots for next 3 days
+          setSlots(getNextNDates(3).map((d) => ({
+            date: d,
+            slots: ['09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM'],
+          })))
+        }
+      })
+      .catch(() => {
+        setSlots(getNextNDates(3).map((d) => ({
+          date: d,
+          slots: ['09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM'],
+        })))
+      })
+      .finally(() => setLoadingSlots(false))
+  }, [selectedAdvocate])
+
   const canProceed = selectedAdvocate && selectedDate && selectedTime
-  const currentDaySlots = SLOTS.find((s) => s.date === selectedDate)?.slots ?? []
+  const currentDaySlots = slots.find((s) => s.date === selectedDate)?.slots ?? []
 
   const handleProceedToPayment = () => {
     if (!canProceed || !selectedAdvocate) return
@@ -152,8 +241,14 @@ export default function ConsultationPage() {
           <div className="lg:col-span-2 space-y-8">
             <section>
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Select Advocate</h2>
+              {loadingAdvocates ? (
+                <div className="flex items-center gap-3 text-gray-500 py-8">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="text-sm">Loading available advocates…</span>
+                </div>
+              ) : (
               <div className="grid md:grid-cols-2 gap-6">
-                {ADVOCATES.map((a) => (
+                {advocates.map((a) => (
                   <button
                     key={a.id}
                     type="button"
@@ -191,6 +286,7 @@ export default function ConsultationPage() {
                   </button>
                 ))}
               </div>
+              )}
             </section>
 
             {selectedAdvocate && (
@@ -198,8 +294,14 @@ export default function ConsultationPage() {
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">Select Date & Time</h2>
                 <div className="bg-white rounded-2xl border-2 border-gray-200 p-6 shadow-lg">
                   <h3 className="font-semibold text-gray-900 mb-3">Date</h3>
+                  {loadingSlots ? (
+                    <div className="flex items-center gap-3 text-gray-500 py-4">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">Checking availability…</span>
+                    </div>
+                  ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-                    {SLOTS.map((s) => (
+                    {slots.map((s) => (
                       <button
                         key={s.date}
                         type="button"
@@ -221,8 +323,9 @@ export default function ConsultationPage() {
                       </button>
                     ))}
                   </div>
+                  )}
 
-                  {selectedDate && (
+                  {!loadingSlots && selectedDate && (
                     <>
                       <h3 className="font-semibold text-gray-900 mb-3">Time</h3>
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">

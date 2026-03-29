@@ -2,7 +2,9 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Upload, CheckCircle, FileText, User, Mail, Phone, File } from 'lucide-react'
+import { ArrowLeft, Upload, CheckCircle, FileText, User, Mail, Phone, File, AlertCircle, Briefcase, MapPin, BookOpen } from 'lucide-react'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1/graphql'
 
 export default function NotaryApplicationPage() {
   const [formData, setFormData] = useState({
@@ -11,11 +13,18 @@ export default function NotaryApplicationPage() {
     lastName: '',
     email: '',
     phone: '',
-    barCouncilFile: null as File | null
+    licenseNumber: '',
+    barCouncilNumber: '',
+    experience: '',
+    specialization: '',
+    location: '',
+    barCouncilFile: null as File | null,
   })
 
   const [submitted, setSubmitted] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [applicationNumber, setApplicationNumber] = useState('')
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -23,15 +32,69 @@ export default function NotaryApplicationPage() {
     }
   }
 
+  const set = (key: keyof typeof formData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setFormData({ ...formData, [key]: e.target.value })
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
     setUploading(true)
 
-    // Simulate upload
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    try {
+      let barCouncilFileBase64: string | null = null
+      if (formData.barCouncilFile) {
+        barCouncilFileBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(formData.barCouncilFile!)
+        })
+      }
 
-    setUploading(false)
-    setSubmitted(true)
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `mutation Apply($input: NotaryApplicationInput!) {
+            submitNotaryApplication(input: $input) {
+              id applicationNumber status
+            }
+          }`,
+          variables: {
+            input: {
+              firstName: formData.firstName,
+              middleName: formData.middleName || null,
+              lastName: formData.lastName,
+              email: formData.email,
+              phone: formData.phone,
+              licenseNumber: formData.licenseNumber || null,
+              barCouncilNumber: formData.barCouncilNumber || null,
+              experience: formData.experience || null,
+              specialization: formData.specialization || null,
+              location: formData.location || null,
+              barCouncilFile: barCouncilFileBase64,
+            },
+          },
+        }),
+      })
+
+      const json = await res.json()
+      if (json.errors?.length) {
+        setError(json.errors[0].message ?? 'Submission failed. Please try again.')
+        return
+      }
+      const result = json.data?.submitNotaryApplication
+      if (!result) {
+        setError('Submission failed. Please try again.')
+        return
+      }
+      setApplicationNumber(result.applicationNumber)
+      setSubmitted(true)
+    } catch {
+      setError('Network error. Please check your connection and try again.')
+    } finally {
+      setUploading(false)
+    }
   }
 
   if (submitted) {
@@ -64,7 +127,7 @@ export default function NotaryApplicationPage() {
               </ul>
             </div>
             <p className="text-sm text-gray-600 mb-6">
-              Application ID: <span className="font-mono font-semibold">NOT-{Math.random().toString(36).substr(2, 9).toUpperCase()}</span>
+              Application ID: <span className="font-mono font-semibold">{applicationNumber}</span>
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <Link
@@ -85,6 +148,9 @@ export default function NotaryApplicationPage() {
       </div>
     )
   }
+
+  const inputCls = 'w-full pl-10 pr-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent'
+  const labelCls = 'block text-sm font-medium text-gray-700 mb-1'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -130,104 +196,121 @@ export default function NotaryApplicationPage() {
 
         {/* Form */}
         <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Name Fields */}
-            <div className="grid md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  First Name *
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    type="text"
-                    required
-                    value={formData.firstName}
-                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                    placeholder="John"
-                    className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  />
+          {error && (
+            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center gap-3 text-sm text-red-700">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              {error}
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-6">
+
+            {/* ── Personal Information ── */}
+            <div>
+              <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <User className="h-4 w-4" /> Personal Information
+              </h3>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className={labelCls}>First Name *</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input type="text" required value={formData.firstName} onChange={set('firstName')} placeholder="John" className={inputCls} />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Middle Name</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input type="text" value={formData.middleName} onChange={set('middleName')} placeholder="Kumar" className={inputCls} />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Last Name *</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input type="text" required value={formData.lastName} onChange={set('lastName')} placeholder="Doe" className={inputCls} />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Middle Name
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={formData.middleName}
-                    onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
-                    placeholder="Kumar"
-                    className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  />
+              <div className="grid md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className={labelCls}>Email Address *</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input type="email" required value={formData.email} onChange={set('email')} placeholder="john@example.com" className={inputCls} />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">We'll send verification updates to this email</p>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Last Name *
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    type="text"
-                    required
-                    value={formData.lastName}
-                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                    placeholder="Doe"
-                    className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  />
+                <div>
+                  <label className={labelCls}>Phone Number *</label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input type="tel" required value={formData.phone} onChange={set('phone')} placeholder="+91 98765 43210" className={inputCls} />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Include country code</p>
                 </div>
               </div>
             </div>
 
-            {/* Email */}
+            {/* ── Professional Details ── */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address *
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="john.doe@example.com"
-                  className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                />
+              <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <Briefcase className="h-4 w-4" /> Professional Details
+              </h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Notary License Number</label>
+                  <div className="relative">
+                    <BookOpen className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input type="text" value={formData.licenseNumber} onChange={set('licenseNumber')} placeholder="LIC-XXXX-YYYY" className={inputCls} />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Bar Council Number</label>
+                  <div className="relative">
+                    <BookOpen className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input type="text" value={formData.barCouncilNumber} onChange={set('barCouncilNumber')} placeholder="BCN-XXXX" className={inputCls} />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Years of Experience</label>
+                  <div className="relative">
+                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input type="number" min="0" max="50" value={formData.experience} onChange={set('experience')} placeholder="5" className={inputCls} />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>City / Location</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input type="text" value={formData.location} onChange={set('location')} placeholder="Mumbai, Maharashtra" className={inputCls} />
+                  </div>
+                </div>
               </div>
-              <p className="text-xs text-gray-500 mt-1">We'll send verification updates to this email</p>
+              <div className="mt-4">
+                <label className={labelCls}>Specialization Areas</label>
+                <div className="relative">
+                  <FileText className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={formData.specialization}
+                    onChange={set('specialization')}
+                    placeholder="Property, Affidavit, Power of Attorney (comma-separated)"
+                    className={inputCls}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Enter areas separated by commas</p>
+              </div>
             </div>
 
-            {/* Phone */}
+            {/* ── Document Upload ── */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone Number *
-              </label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="tel"
-                  required
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+91 98765 43210"
-                  className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Include country code</p>
-            </div>
-
-            {/* File Upload */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Bar Council Registration Certificate *
-              </label>
-              <div className="mt-1">
+              <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <Upload className="h-4 w-4" /> Document Upload
+              </h3>
+              <div>
+                <label className={labelCls}>Bar Council Registration Certificate *</label>
                 <label className={`relative flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
                   formData.barCouncilFile
                     ? 'border-green-500 bg-green-50'
@@ -238,9 +321,7 @@ export default function NotaryApplicationPage() {
                       <>
                         <CheckCircle className="h-10 w-10 text-green-600 mb-2" />
                         <p className="text-sm font-semibold text-green-900">{formData.barCouncilFile.name}</p>
-                        <p className="text-xs text-green-700 mt-1">
-                          {(formData.barCouncilFile.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
+                        <p className="text-xs text-green-700 mt-1">{(formData.barCouncilFile.size / 1024 / 1024).toFixed(2)} MB</p>
                         <p className="text-xs text-gray-500 mt-1">Click to change file</p>
                       </>
                     ) : (
@@ -252,13 +333,7 @@ export default function NotaryApplicationPage() {
                       </>
                     )}
                   </div>
-                  <input
-                    type="file"
-                    required
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
+                  <input type="file" required accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} className="hidden" />
                 </label>
               </div>
             </div>
@@ -273,17 +348,13 @@ export default function NotaryApplicationPage() {
               />
               <label htmlFor="terms" className="ml-3 block text-sm text-gray-700">
                 I confirm that all the information provided is accurate and I agree to the{' '}
-                <Link href="/terms" className="text-gray-900 font-semibold hover:underline">
-                  Terms & Conditions
-                </Link>
+                <Link href="/terms" className="text-gray-900 font-semibold hover:underline">Terms & Conditions</Link>
                 {' '}and{' '}
-                <Link href="/privacy-policy" className="text-gray-900 font-semibold hover:underline">
-                  Privacy Policy
-                </Link>
+                <Link href="/privacy-policy" className="text-gray-900 font-semibold hover:underline">Privacy Policy</Link>
               </label>
             </div>
 
-            {/* Submit Button */}
+            {/* Submit */}
             <div className="flex gap-4 pt-2">
               <Link
                 href="/join-notary"

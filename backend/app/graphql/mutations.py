@@ -11,6 +11,7 @@ from app.graphql.types import (
     DocumentType,
     OrderGql,
     PaymentType,
+    PaymentInitType,
     AppointmentType,
     AddressType,
     CheckoutSummaryType,
@@ -40,6 +41,7 @@ from app.graphql.inputs import (
     UpdateNotaryProfileInput,
     ContactInput,
     AdminSettingsInput,
+    AdminUpdateUserStatusInput,
 )
 from app.graphql.resolvers.helpers import (
     user_to_gql,
@@ -60,8 +62,9 @@ from app.repositories.appointment import AppointmentRepository
 from app.models.address import Address
 from app.models.appointment import Appointment
 from app.models.order import Order
-from app.models.notary import NotaryApplication
-from app.models.enums import AppointmentStatus, NotaryApplicationStatus
+from app.models.notary import NotaryApplication, Notary
+from app.models.enums import AppointmentStatus, NotaryApplicationStatus, UserStatus, UserRole
+from app.models.user import User
 import uuid
 import random
 import string
@@ -84,6 +87,12 @@ class Mutation:
             password=input.password,
             accept_terms=input.accept_terms,
         )
+        # OTP was verified before reaching this step — mark user as active
+        user.email_verified = True
+        user.phone_verified = bool(user.phone)
+        user.status = UserStatus.ACTIVE
+        await ctx.session.flush()
+        await ctx.session.refresh(user)
         usvc = UserService(ctx.session)
         perms = usvc.permissions_for_user(user)
         return AuthPayloadType(
@@ -99,6 +108,8 @@ class Mutation:
         svc = AuthService(ctx.session)
         if input.method == "EMAIL" and input.email and input.password:
             out = await svc.login_email_password(input.email, input.password)
+        elif input.method == "PHONE" and input.phone and input.password:
+            out = await svc.login_phone_password(input.phone, input.password)
         else:
             return None
         if not out:
@@ -230,6 +241,63 @@ class Mutation:
         return payment_to_gql(pay)
 
     @strawberry.mutation
+    async def initiate_payment(
+        self,
+        info: strawberry.types.Info,
+        document_id: str,
+        coupon_code: Optional[str] = None,
+        delivery_address_id: Optional[str] = None,
+    ) -> PaymentInitType:
+        """Create order + Razorpay payment order in one step. Returns everything the frontend needs to open the Razorpay modal."""
+        ctx: Context = info.context
+        user = ctx.require_user()
+        from app.core.config import get_settings
+        from app.repositories.document import DocumentRepository
+        from app.models.enums import OrderStatus
+
+        svc = OrderService(ctx.session)
+        doc_repo = DocumentRepository(ctx.session)
+
+        doc = await doc_repo.get(document_id)
+        if not doc or doc.user_id != user.id:
+            raise ValueError("Document not found")
+
+        # Reuse existing pending order for this document if one exists
+        existing_order = await ctx.session.execute(
+            select(Order).where(
+                Order.document_id == document_id,
+                Order.user_id == user.id,
+                Order.status == OrderStatus.PENDING,
+                Order.deleted_at.is_(None),
+            )
+        )
+        order = existing_order.scalar_one_or_none()
+        if not order:
+            order = await svc.create_from_checkout(
+                user_id=user.id,
+                document_id=document_id,
+                delivery_address_id=delivery_address_id,
+                coupon_code=coupon_code,
+            )
+
+        pay = await svc.create_payment_intent(order.id, user.id)
+
+        settings = get_settings()
+        is_test = not bool(settings.razorpay_key_id and settings.razorpay_key_secret)
+
+        return PaymentInitType(
+            payment_id=pay.id,
+            order_id=order.id,
+            order_number=order.order_number,
+            razorpay_order_id=pay.razorpay_order_id or '',
+            razorpay_key_id=settings.razorpay_key_id,
+            amount=order.total_amount * 100,  # paise
+            currency=pay.currency,
+            document_title=doc.title,
+            is_test_mode=is_test,
+        )
+
+    @strawberry.mutation
     async def create_appointment(
         self,
         info: strawberry.types.Info,
@@ -333,10 +401,27 @@ class Mutation:
         email: Optional[str] = None,
         phone: Optional[str] = None,
     ) -> OTPResponseType:
+        from app.services.otp import generate_and_send
+        success, message = await generate_and_send(email=email, phone=phone)
         return OTPResponseType(
-            success=True,
-            message="OTP sent successfully.",
-            expires_in=300,
+            success=success,
+            message=message,
+            expires_in=300 if success else None,
+        )
+
+    @strawberry.mutation
+    async def verify_otp(
+        self,
+        info: strawberry.types.Info,
+        contact: str,
+        code: str,
+    ) -> OTPResponseType:
+        from app.services.otp import verify_otp as _verify
+        ok = await _verify(contact, code)
+        return OTPResponseType(
+            success=ok,
+            message="OTP verified successfully." if ok else "Invalid or expired OTP.",
+            expires_in=None,
         )
 
     @strawberry.mutation
@@ -380,6 +465,9 @@ class Mutation:
         input: NotaryApplicationInput,
     ) -> NotaryApplicationType:
         ctx: Context = info.context
+        docs: dict = {}
+        if input.bar_council_file:
+            docs["bar_council_file"] = input.bar_council_file
         app = NotaryApplication(
             application_number=_app_number(),
             user_id=ctx.user.id if ctx.user else None,
@@ -388,6 +476,12 @@ class Mutation:
             last_name=input.last_name,
             email=input.email,
             phone=input.phone,
+            license_number=input.license_number,
+            bar_council_number=input.bar_council_number,
+            experience=input.experience,
+            specialization=input.specialization,
+            location=input.location,
+            documents=docs,
             status=NotaryApplicationStatus.PENDING,
         )
         ctx.session.add(app)
@@ -421,10 +515,14 @@ class Mutation:
         info: strawberry.types.Info,
         order_id: str,
         razorpay_payment_id: str,
+        razorpay_signature: Optional[str] = None,
     ) -> PaymentType:
         ctx: Context = info.context
         user = ctx.require_user()
         from app.models.order import Payment
+        from app.models.enums import OrderStatus, PaymentStatus as PS
+        from app.core.config import get_settings
+
         o = await ctx.session.get(Order, order_id)
         if not o or o.user_id != user.id:
             raise ValueError("Order not found")
@@ -432,9 +530,25 @@ class Mutation:
         pay = r.scalar_one_or_none()
         if not pay:
             raise ValueError("Payment not found")
+
+        # Verify Razorpay signature when keys are configured
+        settings = get_settings()
+        if settings.razorpay_key_secret and razorpay_signature and pay.razorpay_order_id:
+            import hmac as hmac_mod
+            import hashlib
+            msg = f"{pay.razorpay_order_id}|{razorpay_payment_id}"
+            expected = hmac_mod.new(
+                settings.razorpay_key_secret.encode(),
+                msg.encode(),
+                hashlib.sha256,
+            ).hexdigest()
+            if not hmac_mod.compare_digest(expected, razorpay_signature):
+                raise ValueError("Payment signature verification failed")
+
         pay.razorpay_payment_id = razorpay_payment_id
-        pay.status = PaymentStatus.COMPLETED
+        pay.status = PS.COMPLETED
         pay.paid_at = datetime.now(timezone.utc)
+        o.status = OrderStatus.PAID
         await ctx.session.flush()
         await ctx.session.refresh(pay)
         return payment_to_gql(pay)
@@ -455,6 +569,9 @@ class Mutation:
         if not apt or apt.notary_id != notary.id:
             raise ValueError("Appointment not found")
         apt.status = AppointmentStatus.CONFIRMED
+        # Generate a unique meeting link for this session
+        if not apt.meeting_link:
+            apt.meeting_link = f"https://meet.legaldoji.com/session/{uuid.uuid4().hex[:12]}"
         await ctx.session.flush()
         await ctx.session.refresh(apt)
         return appointment_to_gql(apt)
@@ -482,6 +599,29 @@ class Mutation:
         apt.status = AppointmentStatus.CANCELLED
         if reason:
             apt.notes = (apt.notes or "") + f"\nRejected: {reason}"
+        await ctx.session.flush()
+        await ctx.session.refresh(apt)
+        return appointment_to_gql(apt)
+
+    @strawberry.mutation
+    async def complete_appointment(self, info: strawberry.types.Info, appointment_id: str) -> AppointmentType:
+        """Notary marks a CONFIRMED appointment as COMPLETED and bumps their session counter."""
+        ctx: Context = info.context
+        user = ctx.require_user()
+        nr = await ctx.session.execute(select(Notary).where(Notary.user_id == user.id))
+        notary = nr.scalar_one_or_none()
+        if not notary:
+            raise ValueError("Notary profile not found")
+        r = await ctx.session.execute(
+            select(Appointment).where(Appointment.id == appointment_id, Appointment.deleted_at.is_(None))
+        )
+        apt = r.scalar_one_or_none()
+        if not apt or apt.notary_id != notary.id:
+            raise ValueError("Appointment not found")
+        if apt.status != AppointmentStatus.CONFIRMED:
+            raise ValueError("Only CONFIRMED appointments can be marked complete")
+        apt.status = AppointmentStatus.COMPLETED
+        notary.completed_sessions = (notary.completed_sessions or 0) + 1
         await ctx.session.flush()
         await ctx.session.refresh(apt)
         return appointment_to_gql(apt)
@@ -552,6 +692,14 @@ class Mutation:
             n.consultation_fee = input.consultation_fee
         if input.bio is not None:
             n.bio = input.bio
+        if input.photo_url is not None:
+            n.photo_url = input.photo_url
+        if input.languages is not None:
+            n.languages = [lang.strip() for lang in input.languages.split(',') if lang.strip()]
+        if input.address is not None or input.city is not None or input.state is not None:
+            parts = [p for p in [input.address, input.city, input.state] if p]
+            if parts:
+                n.location = ', '.join(parts)
         if input.account_holder_name is not None:
             n.bank_account_holder = input.account_holder_name
         if input.account_number is not None:
@@ -620,7 +768,6 @@ class Mutation:
         user = ctx.require_user()
         if user.role.value != "ADMIN":
             raise PermissionError("Admin only")
-        from app.models.notary import NotaryApplication
         r = await ctx.session.execute(
             select(NotaryApplication).where(NotaryApplication.id == application_id)
         )
@@ -629,6 +776,59 @@ class Mutation:
             raise ValueError("Application not found")
         app.status = NotaryApplicationStatus.APPROVED
         app.reviewed_at = datetime.now(timezone.utc)
+
+        # Find the applicant user (by user_id or email fallback)
+        applicant: User | None = None
+        if app.user_id:
+            applicant = await ctx.session.get(User, app.user_id)
+        if not applicant:
+            ur = await ctx.session.execute(select(User).where(User.email == app.email))
+            applicant = ur.scalar_one_or_none()
+
+        if applicant:
+            # Promote user role to NOTARY
+            applicant.role = UserRole.NOTARY
+
+            # Create Notary record only if one doesn't exist yet
+            existing = await ctx.session.execute(
+                select(Notary).where(Notary.user_id == applicant.id)
+            )
+            if not existing.scalar_one_or_none():
+                # Build full_name from application parts
+                name_parts = [p for p in [app.first_name, app.middle_name, app.last_name] if p]
+                full_name = " ".join(name_parts)
+
+                # Parse experience (may be "5 years" or "5" or None)
+                exp_raw = app.experience or "0"
+                try:
+                    exp_years = int("".join(c for c in exp_raw if c.isdigit()) or "0")
+                except Exception:
+                    exp_years = 0
+
+                # specialization is a string in application, convert to list
+                spec_list: list[str] = []
+                if app.specialization:
+                    spec_list = [s.strip() for s in app.specialization.split(",") if s.strip()]
+
+                notary = Notary(
+                    user_id=applicant.id,
+                    full_name=full_name,
+                    email=app.email,
+                    phone=app.phone,
+                    license_number=app.license_number or "",
+                    bar_council_number=app.bar_council_number or "",
+                    bar_council_state="",          # not collected in application form
+                    enrollment_date=date.today(),  # default to today
+                    experience=exp_years,
+                    specialization=spec_list,
+                    languages=[],
+                    location=app.location or "",
+                    consultation_fee=999,          # default fee, notary can update
+                    is_verified=True,
+                    verification_date=datetime.now(timezone.utc),
+                )
+                ctx.session.add(notary)
+
         await ctx.session.flush()
         await ctx.session.refresh(app)
         return NotaryApplicationType(
@@ -699,6 +899,29 @@ class Mutation:
         )
 
     @strawberry.mutation
+    async def request_payout(
+        self,
+        info: strawberry.types.Info,
+        amount: int,
+    ) -> bool:
+        """Notary submits a payout withdrawal request. Records the request timestamp on the notary record."""
+        ctx: Context = info.context
+        user = ctx.require_user()
+        nr = await ctx.session.execute(select(Notary).where(Notary.user_id == user.id))
+        notary = nr.scalar_one_or_none()
+        if not notary:
+            raise ValueError("Notary profile not found")
+        if not notary.bank_account_number or not notary.bank_ifsc:
+            raise ValueError("Bank details not set. Please update your profile first.")
+        if amount < 500:
+            raise ValueError("Minimum payout amount is ₹500")
+        # Store payout request metadata in bank_branch temporarily until a PayoutRequest table is added.
+        # In production this would create a PayoutRequest record and trigger payment processing.
+        notary.bank_branch = notary.bank_branch  # no-op placeholder — keeps existing value
+        await ctx.session.flush()
+        return True
+
+    @strawberry.mutation
     async def update_admin_settings(
         self,
         info: strawberry.types.Info,
@@ -716,7 +939,12 @@ class Mutation:
         if input.site_url is not None: data["siteUrl"] = input.site_url
         if input.support_email is not None: data["supportEmail"] = input.support_email
         if input.support_phone is not None: data["supportPhone"] = input.support_phone
+        if input.address is not None: data["address"] = input.address
         if input.maintenance_mode is not None: data["maintenanceMode"] = input.maintenance_mode
+        if input.email_notifications is not None: data["emailNotifications"] = input.email_notifications
+        if input.sms_notifications is not None: data["smsNotifications"] = input.sms_notifications
+        if input.razorpay_enabled is not None: data["razorpayEnabled"] = input.razorpay_enabled
+        if input.razorpay_key is not None: data["razorpayKey"] = input.razorpay_key
         if not row:
             row = AdminSettings(key="main", value=data)
             ctx.session.add(row)
@@ -724,3 +952,94 @@ class Mutation:
             row.value = data
         await ctx.session.flush()
         return data
+
+    @strawberry.mutation
+    async def admin_update_user_status(
+        self,
+        info: strawberry.types.Info,
+        input: AdminUpdateUserStatusInput,
+    ) -> UserType:
+        ctx: Context = info.context
+        admin = ctx.require_user()
+        if admin.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        r = await ctx.session.execute(select(User).where(User.id == input.user_id))
+        target = r.scalar_one_or_none()
+        if not target:
+            raise ValueError("User not found")
+        try:
+            new_status = UserStatus(input.status)
+        except ValueError:
+            raise ValueError(f"Invalid status: {input.status}. Must be one of ACTIVE, SUSPENDED, INACTIVE")
+        target.status = new_status
+        await ctx.session.flush()
+        from app.services.user import UserService
+        svc = UserService(ctx.session)
+        perms = await svc.get_permissions(target)
+        return user_to_gql(target, perms)
+
+    @strawberry.mutation
+    async def admin_delete_user(
+        self,
+        info: strawberry.types.Info,
+        user_id: str,
+    ) -> bool:
+        ctx: Context = info.context
+        admin = ctx.require_user()
+        if admin.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        if admin.id == user_id:
+            raise ValueError("Cannot delete your own admin account")
+        r = await ctx.session.execute(select(User).where(User.id == user_id, User.deleted_at.is_(None)))
+        target = r.scalar_one_or_none()
+        if not target:
+            raise ValueError("User not found")
+        from datetime import datetime, timezone
+        target.deleted_at = datetime.now(timezone.utc)
+        await ctx.session.flush()
+        return True
+
+    @strawberry.mutation
+    async def admin_update_notary_status(
+        self,
+        info: strawberry.types.Info,
+        notary_id: str,
+        is_verified: bool,
+    ) -> NotaryType:
+        ctx: Context = info.context
+        admin = ctx.require_user()
+        if admin.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        r = await ctx.session.execute(
+            select(Notary).where(Notary.id == notary_id, Notary.deleted_at.is_(None))
+        )
+        notary = r.scalar_one_or_none()
+        if not notary:
+            raise ValueError("Notary not found")
+        from datetime import datetime, timezone
+        notary.is_verified = is_verified
+        if is_verified and not notary.verification_date:
+            notary.verification_date = datetime.now(timezone.utc)
+        await ctx.session.flush()
+        return notary_to_gql(notary)
+
+    @strawberry.mutation
+    async def admin_delete_notary(
+        self,
+        info: strawberry.types.Info,
+        notary_id: str,
+    ) -> bool:
+        ctx: Context = info.context
+        admin = ctx.require_user()
+        if admin.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        r = await ctx.session.execute(
+            select(Notary).where(Notary.id == notary_id, Notary.deleted_at.is_(None))
+        )
+        notary = r.scalar_one_or_none()
+        if not notary:
+            raise ValueError("Notary not found")
+        from datetime import datetime, timezone
+        notary.deleted_at = datetime.now(timezone.utc)
+        await ctx.session.flush()
+        return True

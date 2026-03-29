@@ -1,7 +1,30 @@
+'use client'
+
 import Link from 'next/link'
+import { useState, useEffect } from 'react'
 import { DollarSign, Calendar, MapPin, Shield, TrendingUp, Users, CheckCircle, Clock, ArrowRight } from 'lucide-react'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1/graphql'
+
 export default function JoinNotaryPage() {
+  const [stats, setStats] = useState({ activeNotaries: 0, totalDocuments: 0 })
+
+  useEffect(() => {
+    fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: `query { adminStats { activeNotaries totalDocuments } }` }),
+    })
+      .then(r => r.json())
+      .then(json => {
+        const s = json.data?.adminStats
+        if (s) setStats({ activeNotaries: s.activeNotaries, totalDocuments: s.totalDocuments })
+      })
+      .catch(() => {/* keep defaults */})
+  }, [])
+
+  const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(0)}K+` : n > 0 ? `${n}+` : '—'
+
   const benefits = [
     {
       icon: DollarSign,
@@ -114,11 +137,11 @@ export default function JoinNotaryPage() {
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20">
               <div className="grid grid-cols-2 gap-6">
                 <div className="text-center">
-                  <div className="text-4xl font-bold mb-2">500+</div>
+                  <div className="text-4xl font-bold mb-2">{fmt(stats.activeNotaries)}</div>
                   <div className="text-sm text-gray-300">Active Notaries</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-4xl font-bold mb-2">50K+</div>
+                  <div className="text-4xl font-bold mb-2">{fmt(stats.totalDocuments)}</div>
                   <div className="text-sm text-gray-300">Documents Notarized</div>
                 </div>
                 <div className="text-center">

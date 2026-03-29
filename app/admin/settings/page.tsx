@@ -1,15 +1,31 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   ArrowLeft, Save, Settings, Bell, CreditCard, FileText,
   Users, Shield, Globe, Mail, Phone, MapPin, Building2,
   Lock, Key, Database, Server, AlertCircle, CheckCircle
 } from 'lucide-react'
+import { getToken } from '@/lib/auth'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1/graphql'
+
+async function gql(query: string, variables: Record<string, unknown> = {}) {
+  const token = getToken()
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ query, variables }),
+  })
+  return res.json()
+}
 
 export default function AdminSettingsPage() {
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [settings, setSettings] = useState({
     // General Settings
     siteName: 'LegalDoji E-Notary',
@@ -58,17 +74,63 @@ export default function AdminSettingsPage() {
     backupFrequency: 'daily'
   })
 
+  // Load settings from backend on mount
+  useEffect(() => {
+    gql(`query { adminGetSettings }`)
+      .then(json => {
+        const d = json.data?.adminGetSettings
+        if (!d) return
+        setSettings(prev => ({
+          ...prev,
+          siteName: d.siteName ?? prev.siteName,
+          siteUrl: d.siteUrl ?? prev.siteUrl,
+          supportEmail: d.supportEmail ?? prev.supportEmail,
+          supportPhone: d.supportPhone ?? prev.supportPhone,
+          address: d.address ?? prev.address,
+          maintenanceMode: d.maintenanceMode ?? prev.maintenanceMode,
+          emailNotifications: d.emailNotifications ?? prev.emailNotifications,
+          smsNotifications: d.smsNotifications ?? prev.smsNotifications,
+          razorpayEnabled: d.razorpayEnabled ?? prev.razorpayEnabled,
+          razorpayKey: d.razorpayKey ?? prev.razorpayKey,
+        }))
+      })
+      .catch(() => {/* silently ignore — defaults remain */})
+  }, [])
+
   const handleSave = async () => {
     setSaveStatus('saving')
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-
-    setSaveStatus('saved')
-    setTimeout(() => setSaveStatus('idle'), 3000)
+    try {
+      const json = await gql(
+        `mutation UpdateSettings($input: AdminSettingsInput!) { updateAdminSettings(input: $input) }`,
+        {
+          input: {
+            siteName: settings.siteName,
+            siteUrl: settings.siteUrl,
+            supportEmail: settings.supportEmail,
+            supportPhone: settings.supportPhone,
+            address: settings.address,
+            maintenanceMode: settings.maintenanceMode,
+            emailNotifications: settings.emailNotifications,
+            smsNotifications: settings.smsNotifications,
+            razorpayEnabled: settings.razorpayEnabled,
+            razorpayKey: settings.razorpayKey,
+          },
+        }
+      )
+      if (json.errors?.length) {
+        setSaveStatus('error')
+        setTimeout(() => setSaveStatus('idle'), 3000)
+      } else {
+        setSaveStatus('saved')
+        setTimeout(() => setSaveStatus('idle'), 3000)
+      }
+    } catch {
+      setSaveStatus('error')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    }
   }
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = (field: string, value: unknown) => {
     setSettings({ ...settings, [field]: value })
   }
 
@@ -96,30 +158,17 @@ export default function AdminSettingsPage() {
             <button
               onClick={handleSave}
               disabled={saveStatus === 'saving'}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
-                saveStatus === 'saved'
-                  ? 'bg-green-600 hover:bg-green-700'
-                  : 'bg-white text-gray-900 hover:bg-gray-100'
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all text-white ${
+                saveStatus === 'saved'  ? 'bg-green-600 hover:bg-green-700' :
+                saveStatus === 'error'  ? 'bg-red-600 hover:bg-red-700' :
+                saveStatus === 'saving' ? 'bg-gray-400 cursor-not-allowed' :
+                'bg-white !text-gray-900 hover:bg-gray-100'
               }`}
             >
-              {saveStatus === 'saving' && (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
-                  Saving...
-                </>
-              )}
-              {saveStatus === 'saved' && (
-                <>
-                  <CheckCircle className="h-5 w-5" />
-                  Saved!
-                </>
-              )}
-              {saveStatus === 'idle' && (
-                <>
-                  <Save className="h-5 w-5" />
-                  Save Changes
-                </>
-              )}
+              {saveStatus === 'saving' && <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900 mr-1"></div>Saving...</>}
+              {saveStatus === 'saved'  && <><CheckCircle className="h-5 w-5" />Saved!</>}
+              {saveStatus === 'error'  && <><AlertCircle className="h-5 w-5" />Save Failed</>}
+              {saveStatus === 'idle'   && <><Save className="h-5 w-5 text-gray-900" /><span className="text-gray-900">Save Changes</span></>}
             </button>
           </div>
         </div>

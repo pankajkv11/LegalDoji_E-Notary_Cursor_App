@@ -26,7 +26,7 @@ class OrderService:
         self,
         user_id: str,
         document_id: str,
-        delivery_address_id: str,
+        delivery_address_id: str | None = None,
         coupon_code: str | None = None,
     ) -> Order:
         summary = await self.doc_svc.get_checkout_summary(document_id, user_id, coupon_code)
@@ -63,12 +63,35 @@ class OrderService:
         pay = existing.scalar_one_or_none()
         if pay:
             return pay
+
+        # Try to create a real Razorpay order when keys are configured
+        from app.core.config import get_settings
+        settings = get_settings()
+        razorpay_order_id = None
+        if settings.razorpay_key_id and settings.razorpay_key_secret:
+            try:
+                import razorpay
+                client = razorpay.Client(auth=(settings.razorpay_key_id, settings.razorpay_key_secret))
+                rp_order = client.order.create({
+                    "amount": order.total_amount * 100,  # Razorpay expects paise
+                    "currency": "INR",
+                    "payment_capture": 1,
+                    "notes": {"order_id": order.id, "order_number": order.order_number},
+                })
+                razorpay_order_id = rp_order["id"]
+            except Exception:
+                pass  # Fall through to mock
+
+        if not razorpay_order_id:
+            # Mock order ID for test mode (no keys configured)
+            razorpay_order_id = "order_mock_" + "".join(random.choices(string.ascii_lowercase + string.digits, k=14))
+
         pay = Payment(
             order_id=order.id,
             amount=order.total_amount,
             currency="INR",
             status=PaymentStatus.PENDING,
-            razorpay_order_id="rp_" + "".join(random.choices(string.ascii_lowercase + string.digits, k=14)),
+            razorpay_order_id=razorpay_order_id,
         )
         self.session.add(pay)
         await self.session.flush()

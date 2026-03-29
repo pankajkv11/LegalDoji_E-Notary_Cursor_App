@@ -109,6 +109,11 @@ class NotaryType:
     bio: Optional[str] = None
     is_verified: bool
     verification_date: Optional[datetime] = None
+    bank_account_holder: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_ifsc: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_branch: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime] = None
@@ -121,6 +126,7 @@ class DocumentType:
     notary_id: Optional[str] = None
     order_id: Optional[str] = None
     template_id: str
+    template_slug: str
     title: str
     category: str
     status: str
@@ -147,6 +153,19 @@ class PaymentType:
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime] = None
+
+
+@strawberry.type
+class PaymentInitType:
+    payment_id: str
+    order_id: str
+    order_number: str
+    razorpay_order_id: str
+    razorpay_key_id: str
+    amount: int       # paise (multiply by 100)
+    currency: str
+    document_title: str
+    is_test_mode: bool
 
 
 @strawberry.type
@@ -204,6 +223,9 @@ class AppointmentType:
     meeting_link: Optional[str] = None
     notes: Optional[str] = None
     order_id: Optional[str] = None
+    client_name: Optional[str] = None
+    client_email: Optional[str] = None
+    client_phone: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime] = None
@@ -345,6 +367,42 @@ class NotaryApplicationType:
 
 
 @strawberry.type
+class AdminDocumentType:
+    id: str
+    user_id: str
+    notary_id: Optional[str] = None
+    order_id: Optional[str] = None
+    template_slug: str
+    title: str
+    category: str
+    status: str
+    completion_percentage: Optional[int] = None
+    pdf_url: Optional[str] = None
+    # Resolved fields
+    client_name: Optional[str] = None
+    client_email: Optional[str] = None
+    notary_name: Optional[str] = None
+    order_amount: Optional[int] = None   # in paise
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: Optional[datetime] = None
+
+
+@strawberry.type
+class AdminUserType:
+    id: str
+    email: str
+    phone: Optional[str] = None
+    name: str
+    role: str
+    status: str
+    document_count: int
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: Optional[datetime] = None
+
+
+@strawberry.type
 class AdminStatsType:
     total_users: int
     total_documents: int
@@ -390,6 +448,21 @@ class ReviewType:
     session_id: Optional[str] = None
     rating: int
     comment: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: Optional[datetime] = None
+
+
+@strawberry.type
+class ReviewWithUserType:
+    id: str
+    user_id: str
+    notary_id: str
+    session_id: Optional[str] = None
+    rating: int
+    comment: Optional[str] = None
+    reviewer_name: Optional[str] = None
+    reviewer_initials: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime] = None

@@ -1,113 +1,143 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
-  UserCheck, Shield, ArrowLeft, Search, Download,
+  UserCheck, Shield, ArrowLeft, Search,
   Star, MapPin, Briefcase, Award, CheckCircle2,
   XCircle, Eye, Trash2, FileText, ChevronDown,
-  Phone, Mail, AlertTriangle, Clock, Calendar
+  Phone, Mail, AlertTriangle, Loader2, RefreshCw
 } from 'lucide-react'
+import { getToken } from '@/lib/auth'
 
-type NotaryStatus = 'verified' | 'pending' | 'suspended' | 'rejected'
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1/graphql'
+
+async function gql(query: string, variables: Record<string, unknown> = {}) {
+  const token = getToken()
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ query, variables }),
+  })
+  return res.json()
+}
 
 interface Notary {
   id: string
-  name: string
+  userId: string
+  fullName: string
   email: string
   phone: string
   licenseNumber: string
   barCouncilNumber: string
+  barCouncilState: string
   experience: number
   specialization: string[]
   location: string
-  rating: number
-  completedDocs: number
   consultationFee: number
-  status: NotaryStatus
-  joinDate: string
-  isAvailable: boolean
+  rating: number
+  reviewsCount: number
+  completedSessions: number
+  bio: string | null
+  isVerified: boolean
+  verificationDate: string | null
+  createdAt: string
+  updatedAt: string
 }
 
-interface Application {
-  id: string
-  name: string
-  email: string
-  phone: string
-  licenseNumber: string
-  barCouncilNumber: string
-  experience: string
-  specialization: string
-  location: string
-  appliedDate: string
-}
+type TabType = 'notaries' | 'applications'
 
-const MOCK_NOTARIES: Notary[] = [
-  { id: 'NOT-001', name: 'Adv. Ramesh Iyer', email: 'ramesh@notary.com', phone: '+91 98765 43212', licenseNumber: 'MH-NOT-2021-001', barCouncilNumber: 'BAR/MH/2018/001', experience: 6, specialization: ['Property', 'Real Estate'], location: 'Mumbai, Maharashtra', rating: 4.8, completedDocs: 245, consultationFee: 999, status: 'verified', joinDate: '2024-01-19', isAvailable: true },
-  { id: 'NOT-002', name: 'Adv. Meera Nair', email: 'meera@notary.com', phone: '+91 98765 43215', licenseNumber: 'KA-NOT-2021-045', barCouncilNumber: 'BAR/KA/2017/045', experience: 9, specialization: ['Family Law', 'Matrimonial'], location: 'Bangalore, Karnataka', rating: 4.9, completedDocs: 189, consultationFee: 1499, status: 'verified', joinDate: '2024-01-15', isAvailable: false },
-  { id: 'NOT-003', name: 'Adv. Suresh Reddy', email: 'suresh@notary.com', phone: '+91 98765 43218', licenseNumber: 'TS-NOT-2020-023', barCouncilNumber: 'BAR/TS/2016/023', experience: 11, specialization: ['Corporate', 'Business'], location: 'Hyderabad, Telangana', rating: 4.7, completedDocs: 312, consultationFee: 1299, status: 'verified', joinDate: '2024-01-12', isAvailable: true },
-  { id: 'NOT-004', name: 'Adv. Anjali Singh', email: 'anjali@notary.com', phone: '+91 98765 43220', licenseNumber: 'DL-NOT-2022-067', barCouncilNumber: 'BAR/DL/2019/067', experience: 5, specialization: ['Civil', 'Criminal'], location: 'New Delhi', rating: 4.6, completedDocs: 156, consultationFee: 899, status: 'suspended', joinDate: '2024-01-10', isAvailable: false },
-]
-
-const MOCK_APPLICATIONS: Application[] = [
-  { id: 'APP-001', name: 'Kavita Menon', email: 'kavita.m@email.com', phone: '+91 98765 43214', licenseNumber: 'KL-NOT-2024-012', barCouncilNumber: 'BAR/KL/2020/1234', experience: '5 years', specialization: 'Property & Real Estate Law', location: 'Kochi, Kerala', appliedDate: '2024-01-22' },
-  { id: 'APP-002', name: 'Arjun Malhotra', email: 'arjun.malhotra@email.com', phone: '+91 98765 43225', licenseNumber: 'UP-NOT-2024-089', barCouncilNumber: 'BAR/UP/2019/5678', experience: '8 years', specialization: 'Corporate & Business Law', location: 'Noida, UP', appliedDate: '2024-01-23' },
-  { id: 'APP-003', name: 'Neha Deshmukh', email: 'neha.d@email.com', phone: '+91 98765 43226', licenseNumber: 'MH-NOT-2024-045', barCouncilNumber: 'BAR/MH/2021/9012', experience: '3 years', specialization: 'Family & Matrimonial Law', location: 'Pune, Maharashtra', appliedDate: '2024-01-23' },
-]
-
-const statusBadge = (status: NotaryStatus) => {
-  switch (status) {
-    case 'verified':  return <span className="bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 w-fit"><CheckCircle2 className="h-3 w-3" />Verified</span>
-    case 'pending':   return <span className="bg-yellow-100 text-yellow-700 text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 w-fit"><Clock className="h-3 w-3" />Pending</span>
-    case 'suspended': return <span className="bg-red-100 text-red-700 text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 w-fit"><XCircle className="h-3 w-3" />Suspended</span>
-    case 'rejected':  return <span className="bg-gray-100 text-gray-600 text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 w-fit"><XCircle className="h-3 w-3" />Rejected</span>
-  }
-}
+const statusBadge = (isVerified: boolean) =>
+  isVerified
+    ? <span className="bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 w-fit"><CheckCircle2 className="h-3 w-3" />Verified</span>
+    : <span className="bg-yellow-100 text-yellow-700 text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 w-fit"><AlertTriangle className="h-3 w-3" />Unverified</span>
 
 export default function NotaryManagementPage() {
-  const [activeTab, setActiveTab] = useState<'notaries' | 'applications'>('notaries')
-  const [notaries, setNotaries] = useState<Notary[]>(MOCK_NOTARIES)
-  const [applications, setApplications] = useState<Application[]>(MOCK_APPLICATIONS)
+  const [notaries, setNotaries] = useState<Notary[]>([])
+  const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | NotaryStatus>('all')
+  const [verifiedFilter, setVerifiedFilter] = useState<'all' | 'true' | 'false'>('all')
+  const [activeTab, setActiveTab] = useState<TabType>('notaries')
   const [selectedNotary, setSelectedNotary] = useState<Notary | null>(null)
 
-  const filteredNotaries = notaries.filter(n => {
-    const matchSearch = n.name.toLowerCase().includes(search.toLowerCase()) ||
-      n.location.toLowerCase().includes(search.toLowerCase()) ||
-      n.licenseNumber.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = statusFilter === 'all' || n.status === statusFilter
-    return matchSearch && matchStatus
-  })
-
-  const handleApprove = (id: string) => {
-    if (confirm('Approve this notary application?')) {
-      setApplications(prev => prev.filter(a => a.id !== id))
+  const fetchNotaries = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const json = await gql(`
+        query AdminNotaries($search: String, $isVerified: Boolean) {
+          adminListNotaries(search: $search, isVerified: $isVerified) {
+            id userId fullName email phone licenseNumber barCouncilNumber
+            barCouncilState experience specialization location consultationFee
+            rating reviewsCount completedSessions bio isVerified verificationDate
+            createdAt updatedAt
+          }
+        }
+      `, {
+        search: search || null,
+        isVerified: verifiedFilter === 'all' ? null : verifiedFilter === 'true',
+      })
+      if (json.errors?.length) { setError(json.errors[0].message); return }
+      setNotaries(json.data?.adminListNotaries ?? [])
+    } catch {
+      setError('Failed to load notaries')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleReject = (id: string) => {
-    if (confirm('Reject this notary application?')) {
-      setApplications(prev => prev.filter(a => a.id !== id))
-    }
+  useEffect(() => { fetchNotaries() }, [verifiedFilter])
+
+  useEffect(() => {
+    const t = setTimeout(() => fetchNotaries(), 400)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const handleToggleVerification = async (id: string, current: boolean) => {
+    const action = current ? 'suspend' : 'verify'
+    if (!confirm(`Are you sure you want to ${action} this notary?`)) return
+    setActionLoading(id)
+    try {
+      const json = await gql(
+        `mutation UpdateNotary($id: String!, $isVerified: Boolean!) { adminUpdateNotaryStatus(notaryId: $id, isVerified: $isVerified) { id isVerified } }`,
+        { id, isVerified: !current }
+      )
+      if (json.errors?.length) { alert(json.errors[0].message); return }
+      setNotaries(prev => prev.map(n => n.id === id ? { ...n, isVerified: !current } : n))
+      if (selectedNotary?.id === id) setSelectedNotary(prev => prev ? { ...prev, isVerified: !current } : null)
+    } catch { alert('Network error. Please try again.') }
+    finally { setActionLoading(null) }
   }
 
-  const handleSuspend = (id: string) => {
-    setNotaries(prev => prev.map(n => n.id === id ? { ...n, status: 'suspended' } : n))
-    if (selectedNotary?.id === id) setSelectedNotary(prev => prev ? { ...prev, status: 'suspended' } : null)
-  }
-
-  const handleActivate = (id: string) => {
-    setNotaries(prev => prev.map(n => n.id === id ? { ...n, status: 'verified' } : n))
-    if (selectedNotary?.id === id) setSelectedNotary(prev => prev ? { ...prev, status: 'verified' } : null)
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this notary? This action cannot be undone.')) return
+    setActionLoading(id)
+    try {
+      const json = await gql(
+        `mutation DeleteNotary($id: String!) { adminDeleteNotary(notaryId: $id) }`,
+        { id }
+      )
+      if (json.errors?.length) { alert(json.errors[0].message); return }
+      setNotaries(prev => prev.filter(n => n.id !== id))
+      if (selectedNotary?.id === id) setSelectedNotary(null)
+    } catch { alert('Network error. Please try again.') }
+    finally { setActionLoading(null) }
   }
 
   const stats = {
     total: notaries.length,
-    verified: notaries.filter(n => n.status === 'verified').length,
-    pending: applications.length,
-    suspended: notaries.filter(n => n.status === 'suspended').length,
+    verified: notaries.filter(n => n.isVerified).length,
+    unverified: notaries.filter(n => !n.isVerified).length,
   }
+
+  const fmt = (dt: string | null) => dt
+    ? new Date(dt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+    : '—'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -123,307 +153,256 @@ export default function NotaryManagementPage() {
                 <Shield className="h-7 w-7" />
                 <div>
                   <h1 className="text-2xl font-bold">Notary Management</h1>
-                  <p className="text-gray-300 text-sm">Manage verified notaries and review applications</p>
+                  <p className="text-gray-300 text-sm">Manage verified notaries on the platform</p>
                 </div>
               </div>
             </div>
-            {applications.length > 0 && (
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setActiveTab('applications')}
-                className="bg-yellow-400 text-gray-900 hover:bg-yellow-300 px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all text-sm"
+                onClick={fetchNotaries}
+                disabled={loading}
+                className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-all text-sm"
               >
-                <AlertTriangle className="h-4 w-4" />
-                {applications.length} Pending Applications
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
               </button>
-            )}
+              <Link
+                href="/admin/notary-applications"
+                className="bg-white text-gray-900 hover:bg-gray-100 px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all text-sm"
+              >
+                <FileText className="h-4 w-4" />
+                Review Applications
+              </Link>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-3 gap-4 mb-8">
           {[
-            { label: 'Total Notaries', value: stats.total, icon: UserCheck, color: 'bg-gray-800' },
-            { label: 'Verified', value: stats.verified, icon: CheckCircle2, color: 'bg-green-600' },
-            { label: 'Pending Applications', value: stats.pending, icon: Clock, color: 'bg-yellow-500' },
-            { label: 'Suspended', value: stats.suspended, icon: XCircle, color: 'bg-red-500' },
-          ].map((s, i) => {
-            const Icon = s.icon
-            return (
-              <div key={i} className="bg-white rounded-xl border border-gray-200 p-5">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className={`${s.color} p-2 rounded-lg`}><Icon className="h-5 w-5 text-white" /></div>
-                  <span className="text-sm font-medium text-gray-600">{s.label}</span>
-                </div>
+            { label: 'Total Notaries', value: loading ? '—' : stats.total, color: 'bg-gray-800' },
+            { label: 'Verified', value: loading ? '—' : stats.verified, color: 'bg-green-600' },
+            { label: 'Unverified', value: loading ? '—' : stats.unverified, color: 'bg-yellow-500' },
+          ].map((s, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
+              <div className={`${s.color} p-3 rounded-lg`}><UserCheck className="h-6 w-6 text-white" /></div>
+              <div>
                 <p className="text-3xl font-bold text-gray-900">{s.value}</p>
+                <p className="text-sm text-gray-600 mt-0.5">{s.label}</p>
               </div>
-            )
-          })}
+            </div>
+          ))}
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit mb-6">
-          <button
-            onClick={() => setActiveTab('notaries')}
-            className={`px-5 py-2 rounded-md text-sm font-semibold transition-all ${activeTab === 'notaries' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
-          >
-            All Notaries ({notaries.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('applications')}
-            className={`px-5 py-2 rounded-md text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'applications' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
-          >
-            Applications
-            {applications.length > 0 && (
-              <span className="bg-yellow-400 text-gray-900 text-xs font-bold px-1.5 py-0.5 rounded-full">{applications.length}</span>
-            )}
-          </button>
-        </div>
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
 
-        {activeTab === 'notaries' && (
-          <div className="flex gap-6">
-            {/* Notary Table */}
-            <div className="flex-1 bg-white rounded-xl border border-gray-200 overflow-hidden">
-              {/* Toolbar */}
-              <div className="p-4 border-b border-gray-200 flex gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by name, license or location..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  />
-                </div>
-                <div className="relative">
-                  <select
-                    value={statusFilter}
-                    onChange={e => setStatusFilter(e.target.value as 'all' | NotaryStatus)}
-                    className="appearance-none pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-                  >
-                    <option value="all">All Status</option>
-                    <option value="verified">Verified</option>
-                    <option value="suspended">Suspended</option>
-                  </select>
-                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                </div>
-                <button className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                  <Download className="h-4 w-4 text-gray-600" />
-                </button>
+        <div className="flex gap-6">
+          {/* Main Table */}
+          <div className="flex-1 bg-white rounded-xl border border-gray-200 overflow-hidden">
+            {/* Toolbar */}
+            <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name, email, license or location..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                />
               </div>
+              <div className="relative">
+                <select
+                  value={verifiedFilter}
+                  onChange={e => setVerifiedFilter(e.target.value as 'all' | 'true' | 'false')}
+                  className="appearance-none pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                >
+                  <option value="all">All Status</option>
+                  <option value="true">Verified</option>
+                  <option value="false">Unverified</option>
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Notary</th>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Location</th>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Specialization</th>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Rating</th>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Docs</th>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredNotaries.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="py-16 text-center text-gray-500">
-                          <UserCheck className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                          <p className="font-medium">No notaries found</p>
-                        </td>
-                      </tr>
-                    ) : filteredNotaries.map(notary => (
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Notary</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">License</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Location</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Specialization</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Rating</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Sessions</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {loading ? (
+                    <tr><td colSpan={8} className="py-16 text-center">
+                      <Loader2 className="h-8 w-8 text-gray-300 animate-spin mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">Loading notaries…</p>
+                    </td></tr>
+                  ) : notaries.length === 0 ? (
+                    <tr><td colSpan={8} className="py-16 text-center text-gray-500">
+                      <UserCheck className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                      <p className="font-medium">No notaries found</p>
+                      <p className="text-sm">Try adjusting your search</p>
+                    </td></tr>
+                  ) : notaries.map(n => {
+                    const isActing = actionLoading === n.id
+                    return (
                       <tr
-                        key={notary.id}
-                        className={`hover:bg-gray-50 transition-colors cursor-pointer ${selectedNotary?.id === notary.id ? 'bg-blue-50' : ''}`}
-                        onClick={() => setSelectedNotary(notary)}
+                        key={n.id}
+                        className={`hover:bg-gray-50 transition-colors cursor-pointer ${selectedNotary?.id === n.id ? 'bg-blue-50' : ''}`}
+                        onClick={() => setSelectedNotary(n)}
                       >
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-gray-800 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
-                              {notary.name.split(' ').slice(-1)[0].slice(0, 2).toUpperCase()}
+                            <div className="w-9 h-9 rounded-full bg-gray-800 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                              {n.fullName.split(' ').map(x => x[0]).slice(0, 2).join('').toUpperCase()}
                             </div>
                             <div>
-                              <p className="font-medium text-gray-900 text-sm">{notary.name}</p>
-                              <p className="text-xs text-gray-500 font-mono">{notary.licenseNumber}</p>
+                              <p className="font-medium text-gray-900 text-sm">{n.fullName}</p>
+                              <p className="text-xs text-gray-500">{n.email}</p>
                             </div>
                           </div>
                         </td>
+                        <td className="py-3 px-4 text-xs font-mono text-gray-600">{n.licenseNumber}</td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-1 text-sm text-gray-600">
-                            <MapPin className="h-3 w-3 text-gray-400" />
-                            {notary.location.split(',')[0]}
+                            <MapPin className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                            <span className="truncate max-w-[100px]">{n.location}</span>
                           </div>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex flex-wrap gap-1">
-                            {notary.specialization.slice(0, 2).map(s => (
-                              <span key={s} className="bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded">{s}</span>
+                            {n.specialization.slice(0, 2).map((s, i) => (
+                              <span key={i} className="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded">{s}</span>
                             ))}
+                            {n.specialization.length > 2 && (
+                              <span className="text-xs text-gray-400">+{n.specialization.length - 2}</span>
+                            )}
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="flex items-center gap-1 text-sm font-semibold text-gray-900">
-                            <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                            {notary.rating}
+                          <div className="flex items-center gap-1 text-sm">
+                            <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
+                            <span className="font-medium text-gray-900">{n.rating.toFixed(1)}</span>
+                            <span className="text-xs text-gray-400">({n.reviewsCount})</span>
                           </div>
                         </td>
-                        <td className="py-3 px-4">
-                          <span className="text-sm font-semibold text-gray-900">{notary.completedDocs}</span>
-                        </td>
-                        <td className="py-3 px-4">{statusBadge(notary.status)}</td>
+                        <td className="py-3 px-4 text-sm text-gray-700">{n.completedSessions}</td>
+                        <td className="py-3 px-4">{statusBadge(n.isVerified)}</td>
                         <td className="py-3 px-4" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center gap-1">
-                            <button onClick={() => setSelectedNotary(notary)} className="p-1.5 rounded hover:bg-gray-100 text-gray-600 transition-colors"><Eye className="h-4 w-4" /></button>
-                            {notary.status === 'verified' ? (
-                              <button onClick={() => handleSuspend(notary.id)} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors" title="Suspend"><XCircle className="h-4 w-4" /></button>
-                            ) : (
-                              <button onClick={() => handleActivate(notary.id)} className="p-1.5 rounded hover:bg-green-50 text-gray-400 hover:text-green-600 transition-colors" title="Activate"><CheckCircle2 className="h-4 w-4" /></button>
-                            )}
-                            <button onClick={() => { if (confirm('Delete notary?')) setNotaries(p => p.filter(n => n.id !== notary.id)) }} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
+                            <button onClick={() => setSelectedNotary(n)} className="p-1.5 rounded hover:bg-gray-100 text-gray-600 transition-colors" title="View"><Eye className="h-4 w-4" /></button>
+                            <button
+                              onClick={() => handleToggleVerification(n.id, n.isVerified)}
+                              disabled={isActing}
+                              className={`p-1.5 rounded transition-colors disabled:opacity-50 ${n.isVerified ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'}`}
+                              title={n.isVerified ? 'Suspend' : 'Verify'}
+                            >
+                              {isActing ? <Loader2 className="h-4 w-4 animate-spin" /> : n.isVerified ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                            </button>
+                            <button
+                              onClick={() => handleDelete(n.id)}
+                              disabled={isActing}
+                              className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
                           </div>
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-4 border-t border-gray-200 text-sm text-gray-500">
+              {loading ? 'Loading…' : `${notaries.length} notaries`}
+            </div>
+          </div>
+
+          {/* Detail Panel */}
+          {selectedNotary && (
+            <div className="w-80 flex-shrink-0 bg-white rounded-xl border border-gray-200 p-6 h-fit sticky top-6">
+              <div className="flex items-start justify-between mb-4">
+                <h3 className="font-bold text-gray-900">Notary Details</h3>
+                <button onClick={() => setSelectedNotary(null)} className="text-gray-400 hover:text-gray-600"><XCircle className="h-5 w-5" /></button>
               </div>
 
-              <div className="p-4 border-t border-gray-200 text-sm text-gray-500">
-                Showing {filteredNotaries.length} of {notaries.length} notaries
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 rounded-full bg-gray-800 text-white flex items-center justify-center text-2xl font-bold mx-auto mb-3">
+                  {selectedNotary.fullName.split(' ').map(x => x[0]).slice(0, 2).join('').toUpperCase()}
+                </div>
+                <h4 className="font-bold text-gray-900">{selectedNotary.fullName}</h4>
+                <div className="flex items-center justify-center gap-1 mt-1">
+                  <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
+                  <span className="text-sm font-medium">{selectedNotary.rating.toFixed(1)}</span>
+                  <span className="text-xs text-gray-400">({selectedNotary.reviewsCount} reviews)</span>
+                </div>
+                <div className="flex items-center justify-center mt-2">{statusBadge(selectedNotary.isVerified)}</div>
+              </div>
+
+              <div className="space-y-3 mb-5 text-sm">
+                <div className="flex items-center gap-3 text-gray-700"><Mail className="h-4 w-4 text-gray-400 flex-shrink-0" /><span className="break-all">{selectedNotary.email}</span></div>
+                <div className="flex items-center gap-3 text-gray-700"><Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />{selectedNotary.phone}</div>
+                <div className="flex items-center gap-3 text-gray-700"><MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />{selectedNotary.location}</div>
+                <div className="flex items-center gap-3 text-gray-700"><Briefcase className="h-4 w-4 text-gray-400 flex-shrink-0" />{selectedNotary.experience} years experience</div>
+                <div className="flex items-start gap-3 text-gray-700">
+                  <Award className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex flex-wrap gap-1">
+                    {selectedNotary.specialization.map((s, i) => (
+                      <span key={i} className="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded">{s}</span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-gray-700"><FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />{selectedNotary.completedSessions} sessions completed</div>
+                <div className="text-xs text-gray-400 pt-1 border-t">
+                  <p>License: <span className="font-mono">{selectedNotary.licenseNumber}</span></p>
+                  <p className="mt-0.5">Bar Council: <span className="font-mono">{selectedNotary.barCouncilNumber}</span></p>
+                  {selectedNotary.verificationDate && <p className="mt-0.5">Verified: {fmt(selectedNotary.verificationDate)}</p>}
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-3 mb-4 flex justify-between items-center">
+                <span className="text-sm text-gray-600">Consultation Fee</span>
+                <span className="text-lg font-bold text-gray-900">₹{selectedNotary.consultationFee}</span>
+              </div>
+
+              <div className="space-y-2">
+                <button
+                  onClick={() => handleToggleVerification(selectedNotary.id, selectedNotary.isVerified)}
+                  disabled={actionLoading === selectedNotary.id}
+                  className={`w-full py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 ${
+                    selectedNotary.isVerified
+                      ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
+                >
+                  {actionLoading === selectedNotary.id ? <Loader2 className="h-4 w-4 animate-spin" /> : selectedNotary.isVerified ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                  {selectedNotary.isVerified ? 'Suspend Notary' : 'Verify Notary'}
+                </button>
+                <button
+                  onClick={() => handleDelete(selectedNotary.id)}
+                  disabled={actionLoading === selectedNotary.id}
+                  className="w-full bg-red-50 hover:bg-red-100 text-red-700 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 border border-red-200 transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" /> Delete Notary
+                </button>
               </div>
             </div>
-
-            {/* Notary Detail Panel */}
-            {selectedNotary && (
-              <div className="w-80 flex-shrink-0 bg-white rounded-xl border border-gray-200 p-6 h-fit sticky top-6">
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="font-bold text-gray-900">Notary Details</h3>
-                  <button onClick={() => setSelectedNotary(null)} className="text-gray-400 hover:text-gray-600"><XCircle className="h-5 w-5" /></button>
-                </div>
-                <div className="text-center mb-4">
-                  <div className="w-16 h-16 rounded-full bg-gray-800 text-white flex items-center justify-center text-2xl font-bold mx-auto mb-3">
-                    {selectedNotary.name.split(' ').slice(-1)[0].slice(0, 2).toUpperCase()}
-                  </div>
-                  <h4 className="font-bold text-gray-900">{selectedNotary.name}</h4>
-                  <p className="text-xs text-gray-500 font-mono mb-2">{selectedNotary.licenseNumber}</p>
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    {[1,2,3,4,5].map(s => <Star key={s} className={`h-4 w-4 ${s <= Math.floor(selectedNotary.rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />)}
-                    <span className="text-sm font-semibold ml-1">{selectedNotary.rating}</span>
-                  </div>
-                  {statusBadge(selectedNotary.status)}
-                </div>
-
-                <div className="space-y-3 mb-5 text-sm">
-                  <div className="flex items-center gap-2 text-gray-700"><Mail className="h-4 w-4 text-gray-400" />{selectedNotary.email}</div>
-                  <div className="flex items-center gap-2 text-gray-700"><Phone className="h-4 w-4 text-gray-400" />{selectedNotary.phone}</div>
-                  <div className="flex items-center gap-2 text-gray-700"><MapPin className="h-4 w-4 text-gray-400" />{selectedNotary.location}</div>
-                  <div className="flex items-center gap-2 text-gray-700"><Briefcase className="h-4 w-4 text-gray-400" />{selectedNotary.experience} years experience</div>
-                  <div className="flex items-center gap-2 text-gray-700"><FileText className="h-4 w-4 text-gray-400" />{selectedNotary.completedDocs} docs completed</div>
-                  <div className="flex items-center gap-2 text-gray-700"><Award className="h-4 w-4 text-gray-400" />{selectedNotary.barCouncilNumber}</div>
-                </div>
-
-                <div className="mb-4">
-                  <p className="text-xs text-gray-500 mb-2 font-semibold">Specializations</p>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedNotary.specialization.map(s => (
-                      <span key={s} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">{s}</span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-3 mb-4 flex justify-between text-sm">
-                  <span className="text-gray-600">Consultation Fee</span>
-                  <span className="font-bold text-gray-900">₹{selectedNotary.consultationFee}</span>
-                </div>
-
-                <div className="space-y-2">
-                  {selectedNotary.status === 'verified' ? (
-                    <button onClick={() => handleSuspend(selectedNotary.id)} className="w-full bg-red-50 hover:bg-red-100 text-red-700 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 border border-red-200 transition-colors">
-                      <XCircle className="h-4 w-4" /> Suspend Notary
-                    </button>
-                  ) : (
-                    <button onClick={() => handleActivate(selectedNotary.id)} className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors">
-                      <CheckCircle2 className="h-4 w-4" /> Activate Notary
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'applications' && (
-          <div className="space-y-4">
-            {applications.length === 0 ? (
-              <div className="bg-white rounded-xl border border-gray-200 py-20 text-center">
-                <CheckCircle2 className="h-16 w-16 text-green-300 mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-gray-900 mb-1">All Clear!</h3>
-                <p className="text-gray-500">No pending notary applications to review.</p>
-              </div>
-            ) : applications.map(app => (
-              <div key={app.id} className="bg-white rounded-xl border-2 border-gray-200 hover:border-gray-400 transition-all p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="text-xl font-bold text-gray-900">{app.name}</h3>
-                      <span className="bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-full">PENDING</span>
-                      <span className="text-xs text-gray-500 font-mono">{app.id}</span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                      <div className="flex items-center gap-1"><Mail className="h-4 w-4" />{app.email}</div>
-                      <div className="flex items-center gap-1"><Phone className="h-4 w-4" />{app.phone}</div>
-                      <div className="flex items-center gap-1"><MapPin className="h-4 w-4" />{app.location}</div>
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-xs text-gray-500">Applied on</p>
-                    <p className="text-sm font-semibold text-gray-900 flex items-center gap-1"><Calendar className="h-3 w-3" />{app.appliedDate}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-gray-50 rounded-lg p-4 mb-4">
-                  <div><p className="text-xs text-gray-500 mb-1">License Number</p><p className="text-sm font-semibold text-gray-900">{app.licenseNumber}</p></div>
-                  <div><p className="text-xs text-gray-500 mb-1">Bar Council</p><p className="text-sm font-semibold text-gray-900">{app.barCouncilNumber}</p></div>
-                  <div><p className="text-xs text-gray-500 mb-1">Experience</p><p className="text-sm font-semibold text-gray-900 flex items-center gap-1"><Briefcase className="h-4 w-4 text-gray-500" />{app.experience}</p></div>
-                  <div className="col-span-2"><p className="text-xs text-gray-500 mb-1">Specialization</p><p className="text-sm font-semibold text-gray-900 flex items-center gap-1"><Award className="h-4 w-4 text-gray-500" />{app.specialization}</p></div>
-                </div>
-
-                <div className="mb-4">
-                  <p className="text-xs text-gray-500 mb-2 font-semibold">Submitted Documents:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {['Notary Certificate', 'ID Proof', 'Bar Council Certificate'].map(doc => (
-                      <button key={doc} className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs font-medium transition-colors">
-                        <FileText className="h-4 w-4" />{doc}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-4 border-t border-gray-200">
-                  <button className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors">
-                    <Eye className="h-5 w-5" /> View Full Profile
-                  </button>
-                  <button
-                    onClick={() => handleReject(app.id)}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors"
-                  >
-                    <XCircle className="h-5 w-5" /> Reject Application
-                  </button>
-                  <button
-                    onClick={() => handleApprove(app.id)}
-                    className="flex-1 bg-gray-900 hover:bg-black text-white px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors"
-                  >
-                    <CheckCircle2 className="h-5 w-5" /> Approve & Activate
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )

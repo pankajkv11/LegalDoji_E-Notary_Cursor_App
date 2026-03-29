@@ -13,3 +13,6 @@ python-multipart>=0.0.6
 starlette-admin>=0.16
 aiosqlite>=0.19
 greenlet>=3.0
+aiosmtplib>=3.0
+twilio>=9.0
+razorpay>=1.4

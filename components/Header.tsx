@@ -51,7 +51,7 @@ export default function Header() {
     user: [
       { name: 'Personal Details', href: '/dashboard', icon: User },
       { name: 'My Dashboard', href: '/dashboard', icon: LayoutDashboard },
-      { name: 'My Documents', href: '/dashboard', icon: FileText },
+      { name: 'My Documents', href: '/dashboard/documents', icon: FileText },
       { name: 'Settings', href: '/settings', icon: Settings },
     ],
     notary: [
@@ -62,7 +62,8 @@ export default function Header() {
     ],
     admin: [
       { name: 'Admin Panel', href: '/admin', icon: Shield },
-      { name: 'User Management', href: '/admin', icon: Users },
+      { name: 'User Management', href: '/admin/users', icon: Users },
+      { name: 'Notary Applications', href: '/admin/notary-applications', icon: Briefcase },
       { name: 'Settings', href: '/settings', icon: Settings },
     ],
   }[user.role]) : []

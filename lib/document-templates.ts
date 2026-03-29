@@ -231,6 +231,8 @@ export interface CreateDraft {
   formData: Record<string, string>
   documentTitle: string
   shortDescription: string
+  documentId?: string          // DB document id after saving to API
+  deliveryAddressId?: string   // DB address id after saving delivery address
 }
 
 export function saveCreateDraft(draft: CreateDraft): void {

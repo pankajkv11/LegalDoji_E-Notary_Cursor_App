@@ -78,6 +78,25 @@ class AuthService:
         await self.session.flush()
         return user, access, refresh, expires_in
 
+    async def login_phone_password(self, phone: str, password: str) -> tuple[User, str, str, int] | None:
+        user = await self.user_repo.get_by_phone(phone)
+        if not user or not user.hashed_password:
+            return None
+        if not verify_password(password, user.hashed_password):
+            return None
+        if user.status != UserStatus.ACTIVE:
+            raise ValueError("Account is not active")
+        access, expires_in = create_access_token(str(user.id))
+        refresh = create_refresh_token(str(user.id))
+        rt = RefreshToken(
+            user_id=user.id,
+            token=refresh,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        )
+        self.session.add(rt)
+        await self.session.flush()
+        return user, access, refresh, expires_in
+
     async def refresh_tokens(self, refresh_token: str) -> tuple[User, str, str, int] | None:
         rt = await self.refresh_repo.get_by_token(refresh_token)
         if not rt:

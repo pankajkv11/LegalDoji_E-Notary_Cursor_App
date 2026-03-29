@@ -127,6 +127,11 @@ class NotaryApplicationInput:
     last_name: str
     email: str
     phone: str
+    license_number: str | None = None
+    bar_council_number: str | None = None
+    experience: str | None = None       # e.g. "5" or "5 years"
+    specialization: str | None = None   # comma-separated
+    location: str | None = None
     bar_council_file: str | None = None  # Upload placeholder; use base64 or URL in real impl
 
 
@@ -162,6 +167,7 @@ class UpdateNotaryProfileInput:
     languages: str | None = None
     consultation_fee: int | None = None
     bio: str | None = None
+    photo_url: str | None = None
     account_holder_name: str | None = None
     account_number: str | None = None
     ifsc_code: str | None = None
@@ -176,6 +182,12 @@ class ContactInput:
     phone: str | None = None
     subject: str
     message: str
+
+
+@strawberry.input
+class AdminUpdateUserStatusInput:
+    user_id: str
+    status: str  # ACTIVE | SUSPENDED | INACTIVE
 
 
 @strawberry.input

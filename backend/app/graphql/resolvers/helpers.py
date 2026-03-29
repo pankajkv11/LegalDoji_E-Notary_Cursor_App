@@ -61,6 +61,7 @@ def doc_to_gql(d: Document) -> DocumentType:
         notary_id=d.notary_id,
         order_id=d.order_id,
         template_id=d.template_id,
+        template_slug=d.template.slug if d.template else '',
         title=d.title,
         category=d.category.value,
         status=d.status.value,
@@ -161,7 +162,7 @@ def delivery_to_gql(d: Delivery) -> DeliveryType:
     )
 
 
-def appointment_to_gql(a: Appointment) -> AppointmentType:
+def appointment_to_gql(a: Appointment, client: "User | None" = None) -> AppointmentType:
     return AppointmentType(
         id=a.id,
         user_id=a.user_id,
@@ -174,6 +175,9 @@ def appointment_to_gql(a: Appointment) -> AppointmentType:
         meeting_link=a.meeting_link,
         notes=a.notes,
         order_id=a.order_id,
+        client_name=client.name if client else None,
+        client_email=client.email if client else None,
+        client_phone=client.phone if client else None,
         created_at=a.created_at,
         updated_at=a.updated_at,
         deleted_at=a.deleted_at,
@@ -221,6 +225,11 @@ def notary_to_gql(n: Notary) -> NotaryType:
         bio=n.bio,
         is_verified=n.is_verified,
         verification_date=n.verification_date,
+        bank_account_holder=n.bank_account_holder,
+        bank_account_number=n.bank_account_number,
+        bank_ifsc=n.bank_ifsc,
+        bank_name=n.bank_name,
+        bank_branch=n.bank_branch,
         created_at=n.created_at,
         updated_at=n.updated_at,
         deleted_at=n.deleted_at,

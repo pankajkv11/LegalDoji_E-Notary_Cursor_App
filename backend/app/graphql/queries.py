@@ -21,11 +21,16 @@ from app.graphql.types import (
     FAQType,
     PricingPlanType,
     AdminStatsType,
+    AdminUserType,
+    AdminDocumentType,
     ReportRevenueByTypeType,
     TransactionType,
     PageInfoType,
     DocumentConnectionType,
     TimeSlotType,
+    NotaryAvailabilityType,
+    NotaryApplicationType,
+    ReviewWithUserType,
 )
 from app.graphql.inputs import DocumentsFilterInput, OrdersFilterInput, ReportsFilterInput
 from app.graphql.resolvers.helpers import (
@@ -55,6 +60,25 @@ from app.models.enums import (
     AppointmentStatus,
     NotaryApplicationStatus,
 )
+
+
+def _hourly_slots(start: str, end: str, break_start: str | None, break_end: str | None) -> list[str]:
+    """Generate hourly AM/PM slots between HH:MM start and end, skipping break window."""
+    def _h(t: str) -> int:
+        return int(t.split(":")[0])
+
+    def _fmt(h: int) -> str:
+        period = "AM" if h < 12 else "PM"
+        h12 = h % 12 or 12
+        return f"{h12:02d}:00 {period}"
+
+    bs = _h(break_start) if break_start else None
+    be = _h(break_end) if break_end else None
+    return [
+        _fmt(h)
+        for h in range(_h(start), _h(end))
+        if not (bs is not None and be is not None and bs <= h < be)
+    ]
 from app.services.user import UserService
 from app.services.document import DocumentService
 from app.repositories.order import OrderRepository
@@ -266,20 +290,172 @@ class Query:
         ctx: Context = info.context
         start = date.fromisoformat(start_date)
         end = date.fromisoformat(end_date)
+
+        from app.models.notary import NotaryAvailability as NotaryAvailabilityModel
+        r = await ctx.session.execute(
+            select(NotaryAvailabilityModel).where(NotaryAvailabilityModel.notary_id == notary_id)
+        )
+        avail = r.scalar_one_or_none()
+
+        repo = AppointmentRepository(ctx.session)
+        booked = await repo.get_slots_for_notary(notary_id, start, end)
+        booked_set = {(str(b.scheduled_date), b.scheduled_time) for b in booked}
+
+        day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
         out = []
         current = start
         while current <= end:
-            out.append(
-                TimeSlotType(
-                    date=current,
-                    slots=[
-                        "09:00 AM", "10:00 AM", "11:00 AM",
-                        "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM",
-                    ],
+            day_name = day_names[current.weekday()]
+            if avail and avail.days:
+                day_data = next(
+                    (d for d in avail.days if d.get("day") == day_name and d.get("enabled")),
+                    None,
                 )
-            )
+                if day_data:
+                    slots = []
+                    for slot_range in day_data.get("slots", []):
+                        for s in _hourly_slots(
+                            slot_range.get("start", "09:00"),
+                            slot_range.get("end", "17:00"),
+                            avail.break_start,
+                            avail.break_end,
+                        ):
+                            if (str(current), s) not in booked_set:
+                                slots.append(s)
+                    if slots:
+                        out.append(TimeSlotType(date=current, slots=slots))
+                current += timedelta(days=1)
+                continue
+            # No saved availability — use defaults
+            default = ["09:00 AM", "10:00 AM", "11:00 AM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM"]
+            slots = [s for s in default if (str(current), s) not in booked_set]
+            if slots:
+                out.append(TimeSlotType(date=current, slots=slots))
             current += timedelta(days=1)
         return out
+
+    @strawberry.field
+    async def my_notary_profile(self, info: strawberry.types.Info) -> Optional[NotaryType]:
+        ctx: Context = info.context
+        user = ctx.require_user()
+        r = await ctx.session.execute(select(Notary).where(Notary.user_id == user.id))
+        n = r.scalar_one_or_none()
+        return notary_to_gql(n) if n else None
+
+    @strawberry.field
+    async def my_notary_availability(self, info: strawberry.types.Info) -> Optional[NotaryAvailabilityType]:
+        ctx: Context = info.context
+        user = ctx.require_user()
+        from app.models.notary import NotaryAvailability as NotaryAvailabilityModel
+        r = await ctx.session.execute(select(Notary).where(Notary.user_id == user.id))
+        n = r.scalar_one_or_none()
+        if not n:
+            return None
+        ra = await ctx.session.execute(
+            select(NotaryAvailabilityModel).where(NotaryAvailabilityModel.notary_id == n.id)
+        )
+        avail = ra.scalar_one_or_none()
+        if not avail:
+            return None
+        return NotaryAvailabilityType(days=avail.days, break_start=avail.break_start, break_end=avail.break_end)
+
+    @strawberry.field
+    async def notary_appointments(
+        self,
+        info: strawberry.types.Info,
+        status: Optional[str] = None,
+    ) -> List[AppointmentType]:
+        ctx: Context = info.context
+        user = ctx.require_user()
+        r = await ctx.session.execute(select(Notary).where(Notary.user_id == user.id))
+        notary = r.scalar_one_or_none()
+        if not notary:
+            return []
+        repo = AppointmentRepository(ctx.session)
+        st = AppointmentStatus(status) if status else None
+        items = await repo.get_by_notary(notary.id, status=st)
+        result = []
+        for a in items:
+            client_user = await ctx.session.get(User, a.user_id)
+            result.append(appointment_to_gql(a, client_user))
+        return result
+
+    @strawberry.field
+    async def notary_applications(
+        self,
+        info: strawberry.types.Info,
+        status: Optional[str] = None,
+    ) -> List[NotaryApplicationType]:
+        ctx: Context = info.context
+        user = ctx.require_user()
+        if user.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        from app.models.notary import NotaryApplication
+        q = select(NotaryApplication)
+        if status:
+            q = q.where(NotaryApplication.status == NotaryApplicationStatus(status))
+        q = q.order_by(desc(NotaryApplication.applied_at))
+        result = await ctx.session.execute(q)
+        items = result.scalars().all()
+        return [
+            NotaryApplicationType(
+                id=a.id,
+                application_number=a.application_number,
+                user_id=a.user_id,
+                first_name=a.first_name,
+                middle_name=a.middle_name,
+                last_name=a.last_name,
+                email=a.email,
+                phone=a.phone,
+                license_number=a.license_number,
+                bar_council_number=a.bar_council_number,
+                experience=a.experience,
+                specialization=a.specialization,
+                location=a.location,
+                status=a.status.value,
+                applied_at=a.applied_at,
+                reviewed_at=a.reviewed_at,
+                created_at=a.created_at,
+                updated_at=a.updated_at,
+                deleted_at=a.deleted_at,
+            )
+            for a in items
+        ]
+
+    @strawberry.field
+    async def my_notary_reviews(self, info: strawberry.types.Info) -> List[ReviewWithUserType]:
+        ctx: Context = info.context
+        user = ctx.require_user()
+        r = await ctx.session.execute(select(Notary).where(Notary.user_id == user.id))
+        notary = r.scalar_one_or_none()
+        if not notary:
+            return []
+        from app.models.content import Review
+        rv = await ctx.session.execute(
+            select(Review)
+            .where(Review.notary_id == notary.id, Review.deleted_at.is_(None))
+            .order_by(desc(Review.created_at))
+        )
+        reviews = rv.scalars().all()
+        result = []
+        for rev in reviews:
+            reviewer = await ctx.session.get(User, rev.user_id)
+            name = reviewer.name if reviewer else "Anonymous"
+            initials = "".join(p[0].upper() for p in name.split()[:2]) if name else "?"
+            result.append(ReviewWithUserType(
+                id=rev.id,
+                user_id=rev.user_id,
+                notary_id=rev.notary_id,
+                session_id=rev.session_id,
+                rating=rev.rating,
+                comment=rev.comment,
+                reviewer_name=name,
+                reviewer_initials=initials,
+                created_at=rev.created_at,
+                updated_at=rev.updated_at,
+                deleted_at=rev.deleted_at,
+            ))
+        return result
 
     @strawberry.field
     async def delivery(self, info: strawberry.types.Info, order_id: str) -> Optional[DeliveryType]:
@@ -349,6 +525,7 @@ class Query:
         if user.role.value != "ADMIN":
             raise PermissionError("Admin only")
         from app.models.notary import NotaryApplication
+        from datetime import datetime, timezone
         r = await ctx.session.execute(select(func.count()).select_from(User).where(User.deleted_at.is_(None)))
         users_c = r.scalar()
         r = await ctx.session.execute(select(func.count()).select_from(Document).where(Document.deleted_at.is_(None)))
@@ -368,13 +545,166 @@ class Query:
             )
         )
         orders_c = r.scalar()
+        # Revenue this calendar month (paid/delivered orders, total_amount stored in paise)
+        now = datetime.now(timezone.utc)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        r = await ctx.session.execute(
+            select(func.coalesce(func.sum(Order.total_amount), 0)).where(
+                Order.deleted_at.is_(None),
+                Order.status.in_([OrderStatus.PAID, OrderStatus.PROCESSING, OrderStatus.NOTARIZED, OrderStatus.SHIPPED, OrderStatus.DELIVERED]),
+                Order.created_at >= month_start,
+            )
+        )
+        revenue_paise = r.scalar() or 0
         return AdminStatsType(
             total_users=users_c or 0,
             total_documents=docs_c or 0,
             active_notaries=not_c or 0,
             pending_applications=app_c or 0,
-            revenue_month=0.0,
+            revenue_month=round(revenue_paise / 100, 2),
             pending_orders=orders_c or 0,
             active_sessions=0,
             support_tickets=0,
         )
+
+    @strawberry.field
+    async def admin_list_users(
+        self,
+        info: strawberry.types.Info,
+        role: Optional[str] = None,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> List[AdminUserType]:
+        ctx: Context = info.context
+        user = ctx.require_user()
+        if user.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        q = select(User).where(User.deleted_at.is_(None))
+        if role:
+            from app.models.enums import UserRole as UserRoleEnum
+            q = q.where(User.role == UserRoleEnum(role))
+        if status:
+            from app.models.enums import UserStatus as UserStatusEnum
+            q = q.where(User.status == UserStatusEnum(status))
+        if search:
+            like = f"%{search}%"
+            from sqlalchemy import or_
+            q = q.where(or_(User.name.ilike(like), User.email.ilike(like), User.phone.ilike(like)))
+        q = q.order_by(desc(User.created_at))
+        result = await ctx.session.execute(q)
+        users = result.scalars().all()
+        out = []
+        for u in users:
+            doc_count_r = await ctx.session.execute(
+                select(func.count()).select_from(Document).where(
+                    Document.user_id == u.id, Document.deleted_at.is_(None)
+                )
+            )
+            doc_count = doc_count_r.scalar() or 0
+            out.append(AdminUserType(
+                id=u.id,
+                email=u.email,
+                phone=u.phone,
+                name=u.name,
+                role=u.role.value,
+                status=u.status.value,
+                document_count=doc_count,
+                created_at=u.created_at,
+                updated_at=u.updated_at,
+                deleted_at=u.deleted_at,
+            ))
+        return out
+
+    @strawberry.field
+    async def admin_list_documents(
+        self,
+        info: strawberry.types.Info,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> List[AdminDocumentType]:
+        ctx: Context = info.context
+        user = ctx.require_user()
+        if user.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        q = select(Document).where(Document.deleted_at.is_(None))
+        if status:
+            q = q.where(Document.status == DocumentStatus(status))
+        if search:
+            like = f"%{search}%"
+            from sqlalchemy import or_
+            q = q.where(or_(Document.title.ilike(like), Document.id.ilike(like)))
+        q = q.order_by(desc(Document.created_at))
+        result = await ctx.session.execute(q)
+        docs = result.scalars().all()
+        out = []
+        for d in docs:
+            # Resolve client
+            client_user = await ctx.session.get(User, d.user_id) if d.user_id else None
+            # Resolve notary
+            notary_name = None
+            if d.notary_id:
+                notary_obj = await ctx.session.get(Notary, d.notary_id)
+                notary_name = notary_obj.full_name if notary_obj else None
+            # Resolve order amount
+            order_amount = None
+            if d.order_id:
+                order_obj = await ctx.session.get(Order, d.order_id)
+                order_amount = order_obj.total_amount if order_obj else None
+            out.append(AdminDocumentType(
+                id=d.id,
+                user_id=d.user_id,
+                notary_id=d.notary_id,
+                order_id=d.order_id,
+                template_slug=d.template.slug if d.template else '',
+                title=d.title,
+                category=d.category.value,
+                status=d.status.value,
+                completion_percentage=d.completion_percentage,
+                pdf_url=d.pdf_url,
+                client_name=client_user.name if client_user else None,
+                client_email=client_user.email if client_user else None,
+                notary_name=notary_name,
+                order_amount=order_amount,
+                created_at=d.created_at,
+                updated_at=d.updated_at,
+                deleted_at=d.deleted_at,
+            ))
+        return out
+
+    @strawberry.field
+    async def admin_get_settings(self, info: strawberry.types.Info) -> strawberry.scalars.JSON:
+        ctx: Context = info.context
+        user = ctx.require_user()
+        if user.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        from app.models.admin import AdminSettings
+        r = await ctx.session.execute(select(AdminSettings).where(AdminSettings.key == "main"))
+        row = r.scalar_one_or_none()
+        return (row.value if row else {}) or {}
+
+    @strawberry.field
+    async def admin_list_notaries(
+        self,
+        info: strawberry.types.Info,
+        search: Optional[str] = None,
+        is_verified: Optional[bool] = None,
+    ) -> List[NotaryType]:
+        ctx: Context = info.context
+        user = ctx.require_user()
+        if user.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        q = select(Notary).where(Notary.deleted_at.is_(None))
+        if is_verified is not None:
+            q = q.where(Notary.is_verified == is_verified)
+        if search:
+            like = f"%{search}%"
+            from sqlalchemy import or_
+            q = q.where(or_(
+                Notary.full_name.ilike(like),
+                Notary.email.ilike(like),
+                Notary.license_number.ilike(like),
+                Notary.location.ilike(like),
+            ))
+        q = q.order_by(desc(Notary.created_at))
+        result = await ctx.session.execute(q)
+        return [notary_to_gql(n) for n in result.scalars().all()]

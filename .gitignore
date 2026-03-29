@@ -41,4 +41,5 @@ backend/__pycache__/
 backend/**/__pycache__/
 backend/*.pyc
 backend/.env
+backend/.env.example
 .pytest_cache
