@@ -230,6 +230,8 @@ def notary_to_gql(n: Notary) -> NotaryType:
         bank_ifsc=n.bank_ifsc,
         bank_name=n.bank_name,
         bank_branch=n.bank_branch,
+        pending_payout_amount=n.pending_payout_amount,
+        payout_requested_at=n.payout_requested_at,
         created_at=n.created_at,
         updated_at=n.updated_at,
         deleted_at=n.deleted_at,

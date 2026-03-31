@@ -114,6 +114,8 @@ class NotaryType:
     bank_ifsc: Optional[str] = None
     bank_name: Optional[str] = None
     bank_branch: Optional[str] = None
+    pending_payout_amount: Optional[int] = None
+    payout_requested_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime] = None
@@ -451,6 +453,16 @@ class ReviewType:
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime] = None
+
+
+@strawberry.type
+class TopNotaryReportType:
+    id: str
+    name: str
+    location: str
+    documents: int
+    revenue: float
+    rating: float
 
 
 @strawberry.type

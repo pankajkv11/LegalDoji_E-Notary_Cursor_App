@@ -915,9 +915,9 @@ class Mutation:
             raise ValueError("Bank details not set. Please update your profile first.")
         if amount < 500:
             raise ValueError("Minimum payout amount is ₹500")
-        # Store payout request metadata in bank_branch temporarily until a PayoutRequest table is added.
-        # In production this would create a PayoutRequest record and trigger payment processing.
-        notary.bank_branch = notary.bank_branch  # no-op placeholder — keeps existing value
+        from datetime import datetime, timezone
+        notary.pending_payout_amount = amount
+        notary.payout_requested_at = datetime.now(timezone.utc)
         await ctx.session.flush()
         return True
 

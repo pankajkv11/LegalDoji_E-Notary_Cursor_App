@@ -45,6 +45,8 @@ class Notary(Base, TimestampMixin, SoftDeleteMixin):
     bank_ifsc: Mapped[str | None] = mapped_column(String(32), nullable=True)
     bank_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     bank_branch: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    pending_payout_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    payout_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped["User"] = relationship("User", backref="notary_profile", lazy="joined")
     documents: Mapped[list["Document"]] = relationship(

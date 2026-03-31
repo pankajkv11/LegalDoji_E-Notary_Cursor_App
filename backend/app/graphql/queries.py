@@ -25,6 +25,7 @@ from app.graphql.types import (
     AdminDocumentType,
     ReportRevenueByTypeType,
     TransactionType,
+    TopNotaryReportType,
     PageInfoType,
     DocumentConnectionType,
     TimeSlotType,
@@ -708,3 +709,195 @@ class Query:
         q = q.order_by(desc(Notary.created_at))
         result = await ctx.session.execute(q)
         return [notary_to_gql(n) for n in result.scalars().all()]
+
+    # ── Admin Report Queries ──────────────────────────────────────────────────
+
+    def _report_start(self, date_range: str):
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        if date_range == "today":
+            return now.replace(hour=0, minute=0, second=0, microsecond=0)
+        if date_range == "last7days":
+            return now - timedelta(days=7)
+        if date_range == "last90days":
+            return now - timedelta(days=90)
+        if date_range == "thisyear":
+            return now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        return now - timedelta(days=30)  # last30days default
+
+    @strawberry.field
+    async def admin_revenue_by_type(
+        self,
+        info: strawberry.types.Info,
+        date_range: Optional[str] = "last30days",
+    ) -> List[ReportRevenueByTypeType]:
+        ctx: Context = info.context
+        user = ctx.require_user()
+        if user.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        start = self._report_start(date_range or "last30days")
+        paid_statuses = [OrderStatus.PAID, OrderStatus.NOTARIZED, OrderStatus.SHIPPED, OrderStatus.DELIVERED]
+        q = (
+            select(
+                Document.template_id,
+                func.count(Order.id).label("cnt"),
+                func.coalesce(func.sum(Order.total_amount), 0).label("revenue"),
+            )
+            .join(Order, Order.document_id == Document.id)
+            .where(
+                Order.deleted_at.is_(None),
+                Order.status.in_(paid_statuses),
+                Order.created_at >= start,
+            )
+            .group_by(Document.template_id)
+        )
+        result = await ctx.session.execute(q)
+        rows = result.fetchall()
+        template_ids = [r.template_id for r in rows if r.template_id]
+        tmpl_map: dict = {}
+        if template_ids:
+            tr = await ctx.session.execute(
+                select(DocumentTemplate.id, DocumentTemplate.title).where(DocumentTemplate.id.in_(template_ids))
+            )
+            tmpl_map = {row.id: row.title for row in tr.fetchall()}
+        total_rev = sum(r.revenue for r in rows) or 1
+        items = sorted(rows, key=lambda r: r.revenue, reverse=True)[:10]
+        return [
+            ReportRevenueByTypeType(
+                type=tmpl_map.get(r.template_id, "Other"),
+                amount=round(r.revenue / 100, 2),
+                count=r.cnt,
+                percentage=round(r.revenue / total_rev * 100),
+            )
+            for r in items
+        ]
+
+    @strawberry.field
+    async def admin_recent_transactions(
+        self,
+        info: strawberry.types.Info,
+        date_range: Optional[str] = "last30days",
+        limit: int = 10,
+    ) -> List[TransactionType]:
+        ctx: Context = info.context
+        user = ctx.require_user()
+        if user.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        start = self._report_start(date_range or "last30days")
+        q = (
+            select(Order)
+            .where(Order.deleted_at.is_(None), Order.created_at >= start)
+            .order_by(desc(Order.created_at))
+            .limit(limit)
+        )
+        result = await ctx.session.execute(q)
+        orders = result.scalars().all()
+        txns = []
+        for o in orders:
+            doc_title = "Document"
+            if o.document and o.document.template_id:
+                tr = await ctx.session.execute(
+                    select(DocumentTemplate.title).where(DocumentTemplate.id == o.document.template_id)
+                )
+                row = tr.fetchone()
+                doc_title = row[0] if row else "Document"
+            elif not o.document:
+                doc_title = "Consultation"
+            client = o.user.name if o.user else "Unknown"
+            status_val = o.status.value.lower() if hasattr(o.status, "value") else str(o.status).lower()
+            if status_val in ("paid", "notarized", "shipped", "delivered"):
+                status_val = "completed"
+            txns.append(TransactionType(
+                id=f"TXN-{o.order_number}",
+                document=doc_title,
+                client=client,
+                amount=o.total_amount,
+                date=o.created_at.date(),
+                time=o.created_at.strftime("%I:%M %p"),
+                status=status_val,
+            ))
+        return txns
+
+    @strawberry.field
+    async def admin_monthly_revenue(
+        self,
+        info: strawberry.types.Info,
+        months: int = 6,
+    ) -> strawberry.scalars.JSON:
+        ctx: Context = info.context
+        user = ctx.require_user()
+        if user.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        import calendar
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        paid_statuses = [OrderStatus.PAID, OrderStatus.NOTARIZED, OrderStatus.SHIPPED, OrderStatus.DELIVERED]
+        data = []
+        for i in range(months - 1, -1, -1):
+            m = now.month - i
+            y = now.year
+            while m <= 0:
+                m += 12
+                y -= 1
+            m_start = datetime(y, m, 1, tzinfo=timezone.utc)
+            last_day = calendar.monthrange(y, m)[1]
+            m_end = datetime(y, m, last_day, 23, 59, 59, tzinfo=timezone.utc)
+            r = await ctx.session.execute(
+                select(func.coalesce(func.sum(Order.total_amount), 0)).where(
+                    Order.deleted_at.is_(None),
+                    Order.status.in_(paid_statuses),
+                    Order.created_at >= m_start,
+                    Order.created_at <= m_end,
+                )
+            )
+            rev = r.scalar() or 0
+            data.append({"month": m_start.strftime("%b"), "revenue": round(rev / 100, 2)})
+        return data
+
+    @strawberry.field
+    async def admin_top_notaries(
+        self,
+        info: strawberry.types.Info,
+        date_range: Optional[str] = "last30days",
+        limit: int = 5,
+    ) -> List[TopNotaryReportType]:
+        ctx: Context = info.context
+        user = ctx.require_user()
+        if user.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        start = self._report_start(date_range or "last30days")
+        paid_statuses = [OrderStatus.PAID, OrderStatus.NOTARIZED, OrderStatus.SHIPPED, OrderStatus.DELIVERED]
+        q = (
+            select(
+                Order.appointment_id,
+                Notary.id.label("notary_id"),
+                Notary.full_name,
+                Notary.location,
+                Notary.rating,
+                func.count(Order.id).label("doc_count"),
+                func.coalesce(func.sum(Order.total_amount), 0).label("revenue"),
+            )
+            .join(Notary, Notary.user_id == Order.user_id, isouter=True)
+            .where(
+                Order.deleted_at.is_(None),
+                Order.status.in_(paid_statuses),
+                Order.created_at >= start,
+                Notary.id.isnot(None),
+            )
+            .group_by(Notary.id, Notary.full_name, Notary.location, Notary.rating, Order.appointment_id)
+            .order_by(desc("revenue"))
+            .limit(limit)
+        )
+        result = await ctx.session.execute(q)
+        rows = result.fetchall()
+        return [
+            TopNotaryReportType(
+                id=r.notary_id,
+                name=r.full_name or "Unknown",
+                location=r.location or "",
+                documents=r.doc_count,
+                revenue=round(r.revenue / 100, 2),
+                rating=float(r.rating or 0),
+            )
+            for r in rows
+        ]
