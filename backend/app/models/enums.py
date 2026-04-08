@@ -131,3 +131,10 @@ class LoginMethod(str, enum.Enum):
     EMAIL = "EMAIL"
     PHONE = "PHONE"
     GOOGLE = "GOOGLE"
+
+
+class KycStatus(str, enum.Enum):
+    NOT_SUBMITTED = "NOT_SUBMITTED"
+    SUBMITTED = "SUBMITTED"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"

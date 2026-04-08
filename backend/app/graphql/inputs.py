@@ -191,6 +191,18 @@ class AdminUpdateUserStatusInput:
 
 
 @strawberry.input
+class SubmitKycInput:
+    full_name: str
+    dob: str
+    address: str
+    city: str
+    state: str
+    pincode: str
+    pan_number: str
+    aadhar_last4: str
+
+
+@strawberry.input
 class AdminSettingsInput:
     site_name: str | None = None
     site_url: str | None = None

@@ -6,7 +6,7 @@ import {
   Users, Shield, ArrowLeft, Search,
   Eye, Trash2, ChevronDown, Mail, Phone, Calendar,
   FileText, UserCheck, AlertTriangle, CheckCircle,
-  XCircle, Ban, MoreVertical, RefreshCw, Loader2
+  XCircle, Ban, MoreVertical, RefreshCw, Loader2, ShieldCheck, ShieldX, Clock
 } from 'lucide-react'
 import { getToken } from '@/lib/auth'
 
@@ -28,6 +28,8 @@ async function gql(query: string, variables: Record<string, unknown> = {}) {
 type UserRole = 'USER' | 'NOTARY' | 'ADMIN'
 type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'PENDING_VERIFICATION'
 
+type KycStatus = 'NOT_SUBMITTED' | 'SUBMITTED' | 'APPROVED' | 'REJECTED'
+
 interface AdminUser {
   id: string
   name: string
@@ -38,6 +40,10 @@ interface AdminUser {
   documentCount: number
   createdAt: string
   updatedAt: string
+  kycStatus: KycStatus
+  kycPanNumber: string | null
+  kycAadharLast4: string | null
+  kycData: Record<string, string> | null
 }
 
 const roleBadge = (role: UserRole) => {
@@ -59,10 +65,20 @@ const statusBadge = (status: UserStatus) => {
 
 const initials = (name: string) => name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
 
+const kycBadge = (status: KycStatus) => {
+  switch (status) {
+    case 'APPROVED':      return <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1 w-fit"><ShieldCheck className="h-3 w-3" />KYC Approved</span>
+    case 'SUBMITTED':     return <span className="bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1 w-fit"><Clock className="h-3 w-3" />KYC Pending</span>
+    case 'REJECTED':      return <span className="bg-red-100 text-red-700 text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1 w-fit"><ShieldX className="h-3 w-3" />KYC Rejected</span>
+    default:              return <span className="bg-gray-100 text-gray-500 text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1 w-fit"><ShieldX className="h-3 w-3" />KYC Not Submitted</span>
+  }
+}
+
 const LIST_USERS_QUERY = `
   query AdminUsers($role: String, $status: String, $search: String) {
     adminListUsers(role: $role, status: $status, search: $search) {
       id name email phone role status documentCount createdAt updatedAt
+      kycStatus kycPanNumber kycAadharLast4 kycData
     }
   }
 `
@@ -115,6 +131,22 @@ export default function UserManagementPage() {
       if (json.errors?.length) { alert(json.errors[0].message); return }
       setUsers(prev => prev.map(u => u.id === id ? { ...u, status } : u))
       if (selectedUser?.id === id) setSelectedUser(prev => prev ? { ...prev, status } : null)
+    } catch { alert('Network error. Please try again.') }
+    finally { setActionLoading(null) }
+  }
+
+  const handleKyc = async (id: string, action: 'approve' | 'reject') => {
+    setActionLoading(id)
+    try {
+      const mutation = action === 'approve' ? 'adminApproveKyc' : 'adminRejectKyc'
+      const json = await gql(
+        `mutation KycAction($userId: String!) { ${mutation}(userId: $userId) { success kycStatus } }`,
+        { userId: id }
+      )
+      if (json.errors?.length) { alert(json.errors[0].message); return }
+      const newKycStatus = json.data?.[mutation]?.kycStatus as KycStatus
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, kycStatus: newKycStatus } : u))
+      if (selectedUser?.id === id) setSelectedUser(prev => prev ? { ...prev, kycStatus: newKycStatus } : null)
     } catch { alert('Network error. Please try again.') }
     finally { setActionLoading(null) }
   }
@@ -417,6 +449,66 @@ export default function UserManagementPage() {
                   <UserCheck className="h-4 w-4 text-gray-400 flex-shrink-0" />
                   <span className="text-gray-700">Role: {selectedUser.role}</span>
                 </div>
+              </div>
+
+              {/* KYC Section */}
+              <div className="mb-6">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">KYC Verification</h4>
+                <div className="mb-3">{kycBadge(selectedUser.kycStatus)}</div>
+                {selectedUser.kycStatus !== 'NOT_SUBMITTED' && (
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-sm">
+                    {selectedUser.kycPanNumber && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">PAN</span>
+                        <span className="font-mono font-medium text-gray-900">{selectedUser.kycPanNumber}</span>
+                      </div>
+                    )}
+                    {selectedUser.kycAadharLast4 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Aadhaar</span>
+                        <span className="font-mono font-medium text-gray-900">••••••••{selectedUser.kycAadharLast4}</span>
+                      </div>
+                    )}
+                    {selectedUser.kycData?.full_name && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Full Name</span>
+                        <span className="font-medium text-gray-900">{selectedUser.kycData.full_name}</span>
+                      </div>
+                    )}
+                    {selectedUser.kycData?.dob && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">DOB</span>
+                        <span className="font-medium text-gray-900">{selectedUser.kycData.dob}</span>
+                      </div>
+                    )}
+                    {selectedUser.kycData?.city && selectedUser.kycData?.state && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Location</span>
+                        <span className="font-medium text-gray-900">{selectedUser.kycData.city}, {selectedUser.kycData.state}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {selectedUser.kycStatus === 'SUBMITTED' && (
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => handleKyc(selectedUser.id, 'approve')}
+                      disabled={actionLoading === selectedUser.id}
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors disabled:opacity-50"
+                    >
+                      {actionLoading === selectedUser.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => handleKyc(selectedUser.id, 'reject')}
+                      disabled={actionLoading === selectedUser.id}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors disabled:opacity-50"
+                    >
+                      {actionLoading === selectedUser.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldX className="h-3 w-3" />}
+                      Reject
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">

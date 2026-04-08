@@ -23,6 +23,7 @@ from app.graphql.types import (
     ContactSubmissionType,
     NotaryAvailabilityType,
     ReviewType,
+    KycResultType,
 )
 from app.graphql.inputs import (
     LoginInput,
@@ -42,6 +43,7 @@ from app.graphql.inputs import (
     ContactInput,
     AdminSettingsInput,
     AdminUpdateUserStatusInput,
+    SubmitKycInput,
 )
 from app.graphql.resolvers.helpers import (
     user_to_gql,
@@ -56,6 +58,7 @@ from app.graphql.resolvers.helpers import (
 from app.services.auth import AuthService
 from app.services.user import UserService
 from app.services.document import DocumentService
+from app.services import email as email_svc
 from app.services.order import OrderService
 from app.repositories.address import AddressRepository
 from app.repositories.appointment import AppointmentRepository
@@ -973,6 +976,11 @@ class Mutation:
             raise ValueError(f"Invalid status: {input.status}. Must be one of ACTIVE, SUSPENDED, INACTIVE")
         target.status = new_status
         await ctx.session.flush()
+        import asyncio
+        if new_status.value == "SUSPENDED":
+            asyncio.create_task(email_svc.send_account_suspended(target.email, target.name))
+        elif new_status.value == "ACTIVE":
+            asyncio.create_task(email_svc.send_account_activated(target.email, target.name))
         from app.services.user import UserService
         svc = UserService(ctx.session)
         perms = await svc.get_permissions(target)
@@ -1043,3 +1051,70 @@ class Mutation:
         notary.deleted_at = datetime.now(timezone.utc)
         await ctx.session.flush()
         return True
+
+    @strawberry.mutation
+    async def admin_approve_kyc(
+        self,
+        info: strawberry.types.Info,
+        user_id: str,
+    ) -> KycResultType:
+        ctx: Context = info.context
+        admin = ctx.require_user()
+        if admin.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        from app.models.enums import KycStatus
+        from sqlalchemy import select as sa_select
+        r = await ctx.session.execute(sa_select(User).where(User.id == user_id, User.deleted_at.is_(None)))
+        target = r.scalar_one_or_none()
+        if not target:
+            raise ValueError("User not found")
+        target.kyc_status = KycStatus.APPROVED
+        await ctx.session.flush()
+        import asyncio
+        asyncio.create_task(email_svc.send_kyc_approved(target.email, target.name))
+        return KycResultType(success=True, kyc_status=target.kyc_status.value)
+
+    @strawberry.mutation
+    async def admin_reject_kyc(
+        self,
+        info: strawberry.types.Info,
+        user_id: str,
+    ) -> KycResultType:
+        ctx: Context = info.context
+        admin = ctx.require_user()
+        if admin.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        from app.models.enums import KycStatus
+        from sqlalchemy import select as sa_select
+        r = await ctx.session.execute(sa_select(User).where(User.id == user_id, User.deleted_at.is_(None)))
+        target = r.scalar_one_or_none()
+        if not target:
+            raise ValueError("User not found")
+        target.kyc_status = KycStatus.REJECTED
+        await ctx.session.flush()
+        import asyncio
+        asyncio.create_task(email_svc.send_kyc_rejected(target.email, target.name))
+        return KycResultType(success=True, kyc_status=target.kyc_status.value)
+
+    @strawberry.mutation
+    async def submit_kyc(
+        self,
+        info: strawberry.types.Info,
+        input: SubmitKycInput,
+    ) -> KycResultType:
+        ctx: Context = info.context
+        user = ctx.require_user()
+        from app.models.enums import KycStatus
+        user.kyc_pan_number = input.pan_number.upper()
+        user.kyc_aadhar_last4 = input.aadhar_last4[-4:]
+        user.kyc_data = {
+            "full_name": input.full_name,
+            "dob": input.dob,
+            "address": input.address,
+            "city": input.city,
+            "state": input.state,
+            "pincode": input.pincode,
+        }
+        user.kyc_status = KycStatus.SUBMITTED
+        await ctx.session.flush()
+        return KycResultType(success=True, kyc_status=user.kyc_status)

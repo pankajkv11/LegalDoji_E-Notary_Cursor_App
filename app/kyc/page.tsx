@@ -78,30 +78,23 @@ export default function KycPage() {
     setError(null)
     setLoading(true)
     try {
-      // Store KYC metadata as a document record (real KYC service integration pending)
       const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          query: `mutation KycDoc($input: CreateDocumentInput!) {
-            createDocument(input: $input) { id }
+          query: `mutation SubmitKyc($input: SubmitKycInput!) {
+            submitKyc(input: $input) { success kycStatus }
           }`,
           variables: {
             input: {
-              templateId: 'kyc-verification',
-              title: 'KYC Verification',
-              formData: {
-                fullName: form.fullName,
-                dob: form.dob,
-                address: form.address,
-                city: form.city,
-                state: form.state,
-                pincode: form.pincode,
-                panNumber: form.panNumber.toUpperCase(),
-                aadharLast4: form.aadharNumber.slice(-4),
-                status: 'SUBMITTED',
-              },
-              currentStep: 1,
+              fullName: form.fullName,
+              dob: form.dob,
+              address: form.address,
+              city: form.city,
+              state: form.state,
+              pincode: form.pincode,
+              panNumber: form.panNumber.toUpperCase(),
+              aadharLast4: form.aadharNumber.slice(-4),
             },
           },
         }),

@@ -613,6 +613,10 @@ class Query:
                 created_at=u.created_at,
                 updated_at=u.updated_at,
                 deleted_at=u.deleted_at,
+                kyc_status=u.kyc_status.value if u.kyc_status else "NOT_SUBMITTED",
+                kyc_pan_number=u.kyc_pan_number,
+                kyc_aadhar_last4=u.kyc_aadhar_last4,
+                kyc_data=u.kyc_data,
             ))
         return out
 

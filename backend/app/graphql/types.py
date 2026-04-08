@@ -16,6 +16,7 @@ from app.models.enums import (
     PaymentMethod as PaymentMethodEnum,
     FAQCategory as FAQCategoryEnum,
     LoginMethod as LoginMethodEnum,
+    KycStatus as KycStatusEnum,
 )
 
 # Re-export enums for GraphQL
@@ -30,6 +31,13 @@ PaymentStatus = strawberry.enum(PaymentStatusEnum)
 PaymentMethod = strawberry.enum(PaymentMethodEnum)
 FAQCategory = strawberry.enum(FAQCategoryEnum)
 LoginMethod = strawberry.enum(LoginMethodEnum)
+KycStatus = strawberry.enum(KycStatusEnum)
+
+
+@strawberry.type
+class KycResultType:
+    success: bool
+    kyc_status: str
 
 
 @strawberry.type
@@ -402,6 +410,10 @@ class AdminUserType:
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime] = None
+    kyc_status: str = "NOT_SUBMITTED"
+    kyc_pan_number: Optional[str] = None
+    kyc_aadhar_last4: Optional[str] = None
+    kyc_data: Optional[strawberry.scalars.JSON] = None
 
 
 @strawberry.type

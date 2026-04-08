@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, SoftDeleteMixin
-from app.models.enums import UserRole, UserStatus
+from app.models.enums import UserRole, UserStatus, KycStatus
 
 
 class Role(Base, TimestampMixin, SoftDeleteMixin):
@@ -43,6 +43,12 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
     )
     email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     phone_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    kyc_status: Mapped[str] = mapped_column(
+        Enum(KycStatus), nullable=False, default=KycStatus.NOT_SUBMITTED
+    )
+    kyc_pan_number: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    kyc_aadhar_last4: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    kyc_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     role_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("roles.id"), nullable=True
     )
