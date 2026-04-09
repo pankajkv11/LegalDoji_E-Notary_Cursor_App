@@ -42,7 +42,7 @@ export default function Header() {
     { name: 'Home', href: '/', icon: Home },
     { name: 'Services', href: '/services', icon: FileText },
     { name: 'How It Works', href: '/how-it-works', icon: BookOpen },
-    { name: 'Join as Notary', href: '/join-notary', icon: Users },
+    ...(!user ? [{ name: 'Join as Notary', href: '/join-notary', icon: Users }] : []),
     { name: 'FAQ', href: '/faq', icon: HelpCircle },
     { name: 'Contact', href: '/contact', icon: Phone },
   ]

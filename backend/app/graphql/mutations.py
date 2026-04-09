@@ -170,6 +170,7 @@ class Mutation:
             title=input.title,
             current_step=input.current_step,
             draft_id=input.draft_id,
+            notary_id=input.notary_id,
         )
         return doc_to_gql(doc)
 
@@ -489,7 +490,10 @@ class Mutation:
         )
         ctx.session.add(app)
         await ctx.session.flush()
-        await ctx.session.refresh(app        )
+        await ctx.session.refresh(app)
+        import asyncio
+        full_name = " ".join(p for p in [input.first_name, input.middle_name, input.last_name] if p)
+        asyncio.create_task(email_svc.send_notary_application_received(input.email, full_name, app.application_number))
         return NotaryApplicationType(
             id=app.id,
             application_number=app.application_number,
@@ -788,52 +792,73 @@ class Mutation:
             ur = await ctx.session.execute(select(User).where(User.email == app.email))
             applicant = ur.scalar_one_or_none()
 
-        if applicant:
-            # Promote user role to NOTARY
-            applicant.role = UserRole.NOTARY
+        import asyncio
+        import secrets
+        from app.core.security import hash_password as _hash_pw
+        from app.models.enums import KycStatus
 
-            # Create Notary record only if one doesn't exist yet
-            existing = await ctx.session.execute(
-                select(Notary).where(Notary.user_id == applicant.id)
+        name_parts = [p for p in [app.first_name, app.middle_name, app.last_name] if p]
+        full_name = " ".join(name_parts)
+        temp_password: str | None = None
+
+        if not applicant:
+            # No account exists — create one with a temporary password
+            temp_password = secrets.token_urlsafe(10)
+            applicant = User(
+                name=full_name,
+                email=app.email,
+                phone=app.phone,
+                hashed_password=_hash_pw(temp_password),
+                role=UserRole.NOTARY,
+                status=UserStatus.ACTIVE,
+                email_verified=True,
+                phone_verified=bool(app.phone),
+                kyc_status=KycStatus.NOT_SUBMITTED,
             )
-            if not existing.scalar_one_or_none():
-                # Build full_name from application parts
-                name_parts = [p for p in [app.first_name, app.middle_name, app.last_name] if p]
-                full_name = " ".join(name_parts)
+            ctx.session.add(applicant)
+            await ctx.session.flush()
+            await ctx.session.refresh(applicant)
+            app.user_id = applicant.id
+        else:
+            # Promote existing user role to NOTARY
+            applicant.role = UserRole.NOTARY
+            applicant.status = UserStatus.ACTIVE
 
-                # Parse experience (may be "5 years" or "5" or None)
-                exp_raw = app.experience or "0"
-                try:
-                    exp_years = int("".join(c for c in exp_raw if c.isdigit()) or "0")
-                except Exception:
-                    exp_years = 0
-
-                # specialization is a string in application, convert to list
-                spec_list: list[str] = []
-                if app.specialization:
-                    spec_list = [s.strip() for s in app.specialization.split(",") if s.strip()]
-
-                notary = Notary(
-                    user_id=applicant.id,
-                    full_name=full_name,
-                    email=app.email,
-                    phone=app.phone,
-                    license_number=app.license_number or "",
-                    bar_council_number=app.bar_council_number or "",
-                    bar_council_state="",          # not collected in application form
-                    enrollment_date=date.today(),  # default to today
-                    experience=exp_years,
-                    specialization=spec_list,
-                    languages=[],
-                    location=app.location or "",
-                    consultation_fee=999,          # default fee, notary can update
-                    is_verified=True,
-                    verification_date=datetime.now(timezone.utc),
-                )
-                ctx.session.add(notary)
+        # Create Notary record only if one doesn't exist yet
+        existing = await ctx.session.execute(
+            select(Notary).where(Notary.user_id == applicant.id)
+        )
+        if not existing.scalar_one_or_none():
+            exp_raw = app.experience or "0"
+            try:
+                exp_years = int("".join(c for c in exp_raw if c.isdigit()) or "0")
+            except Exception:
+                exp_years = 0
+            spec_list: list[str] = []
+            if app.specialization:
+                spec_list = [s.strip() for s in app.specialization.split(",") if s.strip()]
+            notary = Notary(
+                user_id=applicant.id,
+                full_name=full_name,
+                email=app.email,
+                phone=app.phone,
+                license_number=app.license_number or "",
+                bar_council_number=app.bar_council_number or "",
+                bar_council_state="",
+                enrollment_date=date.today(),
+                experience=exp_years,
+                specialization=spec_list,
+                languages=[],
+                location=app.location or "",
+                consultation_fee=999,
+                is_verified=True,
+                verification_date=datetime.now(timezone.utc),
+            )
+            ctx.session.add(notary)
 
         await ctx.session.flush()
         await ctx.session.refresh(app)
+        asyncio.create_task(email_svc.send_notary_approved(app.email, full_name, temp_password))
         return NotaryApplicationType(
             id=app.id,
             application_number=app.application_number,
@@ -879,6 +904,9 @@ class Mutation:
             app.documents = {**(app.documents or {}), "reject_reason": reason}
         await ctx.session.flush()
         await ctx.session.refresh(app)
+        import asyncio
+        full_name = " ".join(p for p in [app.first_name, app.middle_name, app.last_name] if p)
+        asyncio.create_task(email_svc.send_notary_rejected(app.email, full_name, reason))
         return NotaryApplicationType(
             id=app.id,
             application_number=app.application_number,

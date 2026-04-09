@@ -36,6 +36,7 @@ class CreateDocumentInput:
     form_data: strawberry.scalars.JSON
     current_step: int | None = None
     draft_id: str | None = None
+    notary_id: str | None = None
 
 
 @strawberry.input

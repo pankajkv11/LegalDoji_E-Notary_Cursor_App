@@ -23,6 +23,7 @@ class DocumentService:
         title: str | None = None,
         current_step: int | None = None,
         draft_id: str | None = None,
+        notary_id: str | None = None,
     ) -> Document:
         template = await self.template_repo.get(template_id)
         if not template:
@@ -34,6 +35,8 @@ class DocumentService:
                 existing.title = title or existing.title
                 if current_step is not None:
                     existing.current_step = current_step
+                if notary_id is not None:
+                    existing.notary_id = notary_id
                 await self.session.flush()
                 await self.session.refresh(existing)
                 return existing
@@ -45,6 +48,7 @@ class DocumentService:
             status=DocumentStatus.DRAFT,
             form_data=form_data,
             current_step=current_step or 1,
+            notary_id=notary_id,
         )
         await self.repo.add(doc)
         return doc

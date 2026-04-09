@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft, Search, CheckCircle2, XCircle, Clock, Mail, Phone,
-  FileText, User, Loader2, AlertCircle, Eye, RefreshCw
+  FileText, User, Loader2, AlertCircle, Eye, RefreshCw, AlertTriangle
 } from 'lucide-react'
 import { getToken } from '@/lib/auth'
 
@@ -42,6 +42,7 @@ interface NotaryApplication {
 }
 
 type FilterStatus = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
+type ModalType = 'approve' | 'reject' | null
 
 const STATUS_STYLES: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-700',
@@ -54,14 +55,132 @@ function formatDate(iso: string | null) {
   return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+// ── Confirm Modal ─────────────────────────────────────────────────────────────
+function ApproveModal({
+  app,
+  loading,
+  onConfirm,
+  onCancel,
+}: {
+  app: NotaryApplication
+  loading: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const fullName = [app.firstName, app.middleName, app.lastName].filter(Boolean).join(' ')
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-center w-14 h-14 bg-green-100 rounded-full mx-auto mb-4">
+          <CheckCircle2 className="h-7 w-7 text-green-600" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 text-center mb-1">Approve Application?</h2>
+        <p className="text-sm text-gray-500 text-center mb-5">
+          You are about to approve <span className="font-semibold text-gray-700">{fullName}</span> as a verified notary.
+        </p>
+        <div className="bg-gray-50 rounded-xl p-4 mb-6 space-y-1 text-sm">
+          <div className="flex justify-between"><span className="text-gray-500">Email</span><span className="font-medium text-gray-800">{app.email}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">Application</span><span className="font-mono text-gray-600">{app.applicationNumber}</span></div>
+          {app.location && <div className="flex justify-between"><span className="text-gray-500">Location</span><span className="font-medium text-gray-800">{app.location}</span></div>}
+        </div>
+        <p className="text-xs text-gray-400 text-center mb-5">
+          Their role will be upgraded to <strong>Notary</strong> and they will receive a confirmation email.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl font-semibold text-sm transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            Approve & Activate
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Reject Modal ──────────────────────────────────────────────────────────────
+function RejectModal({
+  app,
+  loading,
+  onConfirm,
+  onCancel,
+}: {
+  app: NotaryApplication
+  loading: boolean
+  onConfirm: (reason: string) => void
+  onCancel: () => void
+}) {
+  const [reason, setReason] = useState('')
+  const fullName = [app.firstName, app.middleName, app.lastName].filter(Boolean).join(' ')
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-center w-14 h-14 bg-red-100 rounded-full mx-auto mb-4">
+          <AlertTriangle className="h-7 w-7 text-red-600" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 text-center mb-1">Reject Application?</h2>
+        <p className="text-sm text-gray-500 text-center mb-5">
+          You are rejecting the application from <span className="font-semibold text-gray-700">{fullName}</span>.
+        </p>
+        <div className="mb-5">
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            Reason for Rejection <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            rows={3}
+            placeholder="e.g. Incomplete documents, Invalid Bar Council number…"
+            className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+          />
+          <p className="text-xs text-gray-400 mt-1">This reason will be included in the rejection email sent to the applicant.</p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl font-semibold text-sm transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => reason.trim() && onConfirm(reason.trim())}
+            disabled={loading || !reason.trim()}
+            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+            Reject Application
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function NotaryApplicationsPage() {
   const [applications, setApplications] = useState<NotaryApplication[]>([])
   const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeFilter, setActiveFilter] = useState<FilterStatus>('ALL')
   const [search, setSearch] = useState('')
   const [selectedApp, setSelectedApp] = useState<NotaryApplication | null>(null)
+
+  // Modal state
+  const [modal, setModal] = useState<{ type: ModalType; app: NotaryApplication } | null>(null)
 
   const fetchApplications = async () => {
     setLoading(true)
@@ -74,10 +193,7 @@ export default function NotaryApplicationsPage() {
           status appliedAt reviewedAt
         }
       }`)
-      if (json.errors?.length) {
-        setError(json.errors[0].message)
-        return
-      }
+      if (json.errors?.length) { setError(json.errors[0].message); return }
       setApplications(json.data?.notaryApplications ?? [])
     } catch {
       setError('Failed to load applications')
@@ -88,46 +204,41 @@ export default function NotaryApplicationsPage() {
 
   useEffect(() => { fetchApplications() }, [])
 
-  const handleApprove = async (id: string) => {
-    if (!confirm('Approve this notary application? The applicant will be able to access the notary dashboard.')) return
-    setActionLoading(id)
+  const confirmApprove = async () => {
+    if (!modal) return
+    setActionLoading(true)
     try {
       const json = await gql(
         `mutation Approve($id: String!) { approveNotaryApplication(applicationId: $id) { id status } }`,
-        { id }
+        { id: modal.app.id }
       )
-      if (json.errors?.length) {
-        alert(json.errors[0].message)
-        return
-      }
-      setApplications(prev => prev.map(a => a.id === id ? { ...a, status: 'APPROVED' } : a))
-      if (selectedApp?.id === id) setSelectedApp(prev => prev ? { ...prev, status: 'APPROVED' } : null)
+      if (json.errors?.length) { setError(json.errors[0].message); return }
+      setApplications(prev => prev.map(a => a.id === modal.app.id ? { ...a, status: 'APPROVED' } : a))
+      if (selectedApp?.id === modal.app.id) setSelectedApp(prev => prev ? { ...prev, status: 'APPROVED' } : null)
+      setModal(null)
     } catch {
-      alert('Network error. Please try again.')
+      setError('Network error. Please try again.')
     } finally {
-      setActionLoading(null)
+      setActionLoading(false)
     }
   }
 
-  const handleReject = async (id: string) => {
-    const reason = prompt('Reason for rejection (sent to applicant):')
-    if (!reason) return
-    setActionLoading(id)
+  const confirmReject = async (reason: string) => {
+    if (!modal) return
+    setActionLoading(true)
     try {
       const json = await gql(
         `mutation Reject($id: String!, $reason: String) { rejectNotaryApplication(applicationId: $id, reason: $reason) { id status } }`,
-        { id, reason }
+        { id: modal.app.id, reason }
       )
-      if (json.errors?.length) {
-        alert(json.errors[0].message)
-        return
-      }
-      setApplications(prev => prev.map(a => a.id === id ? { ...a, status: 'REJECTED' } : a))
-      if (selectedApp?.id === id) setSelectedApp(prev => prev ? { ...prev, status: 'REJECTED' } : null)
+      if (json.errors?.length) { setError(json.errors[0].message); return }
+      setApplications(prev => prev.map(a => a.id === modal.app.id ? { ...a, status: 'REJECTED' } : a))
+      if (selectedApp?.id === modal.app.id) setSelectedApp(prev => prev ? { ...prev, status: 'REJECTED' } : null)
+      setModal(null)
     } catch {
-      alert('Network error. Please try again.')
+      setError('Network error. Please try again.')
     } finally {
-      setActionLoading(null)
+      setActionLoading(false)
     }
   }
 
@@ -158,6 +269,24 @@ export default function NotaryApplicationsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Modals */}
+      {modal?.type === 'approve' && (
+        <ApproveModal
+          app={modal.app}
+          loading={actionLoading}
+          onConfirm={confirmApprove}
+          onCancel={() => setModal(null)}
+        />
+      )}
+      {modal?.type === 'reject' && (
+        <RejectModal
+          app={modal.app}
+          loading={actionLoading}
+          onConfirm={confirmReject}
+          onCancel={() => setModal(null)}
+        />
+      )}
+
       {/* Header */}
       <div className="bg-gradient-to-r from-gray-800 to-black text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -203,13 +332,13 @@ export default function NotaryApplicationsPage() {
           <div className="mb-6 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3 text-sm text-red-700">
             <AlertCircle className="h-4 w-4 flex-shrink-0" />
             {error}
+            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">✕</button>
           </div>
         )}
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* List */}
           <div className="lg:col-span-2">
-            {/* Search + Tabs */}
             <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
                 <Search className="h-4 w-4 text-gray-400 flex-shrink-0" />
@@ -261,7 +390,6 @@ export default function NotaryApplicationsPage() {
             ) : (
               <div className="space-y-3">
                 {filtered.map((app) => {
-                  const isActing = actionLoading === app.id
                   const isPending = app.status === 'PENDING'
                   const fullName = [app.firstName, app.middleName, app.lastName].filter(Boolean).join(' ')
                   return (
@@ -288,17 +416,15 @@ export default function NotaryApplicationsPage() {
                           {isPending && (
                             <>
                               <button
-                                onClick={(e) => { e.stopPropagation(); handleApprove(app.id) }}
-                                disabled={isActing}
-                                className="p-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors disabled:opacity-50"
+                                onClick={(e) => { e.stopPropagation(); setModal({ type: 'approve', app }) }}
+                                className="p-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors"
                                 title="Approve"
                               >
-                                {isActing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                                <CheckCircle2 className="h-4 w-4" />
                               </button>
                               <button
-                                onClick={(e) => { e.stopPropagation(); handleReject(app.id) }}
-                                disabled={isActing}
-                                className="p-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition-colors disabled:opacity-50"
+                                onClick={(e) => { e.stopPropagation(); setModal({ type: 'reject', app }) }}
+                                className="p-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition-colors"
                                 title="Reject"
                               >
                                 <XCircle className="h-4 w-4" />
@@ -347,12 +473,10 @@ export default function NotaryApplicationsPage() {
 
                   <div className="space-y-3 text-sm mb-6">
                     <div className="flex items-center gap-2 text-gray-700">
-                      <Mail className="h-4 w-4 text-gray-400" />
-                      {selectedApp.email}
+                      <Mail className="h-4 w-4 text-gray-400" />{selectedApp.email}
                     </div>
                     <div className="flex items-center gap-2 text-gray-700">
-                      <Phone className="h-4 w-4 text-gray-400" />
-                      {selectedApp.phone}
+                      <Phone className="h-4 w-4 text-gray-400" />{selectedApp.phone}
                     </div>
                     <div className="flex items-start gap-2 text-gray-700">
                       <FileText className="h-4 w-4 text-gray-400 mt-0.5" />
@@ -372,8 +496,7 @@ export default function NotaryApplicationsPage() {
                     )}
                     {selectedApp.experience && (
                       <div className="flex items-center gap-2 text-gray-700">
-                        <Clock className="h-4 w-4 text-gray-400" />
-                        {selectedApp.experience} years experience
+                        <Clock className="h-4 w-4 text-gray-400" />{selectedApp.experience} years experience
                       </div>
                     )}
                     {selectedApp.specialization && (
@@ -387,8 +510,7 @@ export default function NotaryApplicationsPage() {
                     )}
                     {selectedApp.location && (
                       <div className="flex items-center gap-2 text-gray-700">
-                        <User className="h-4 w-4 text-gray-400" />
-                        {selectedApp.location}
+                        <User className="h-4 w-4 text-gray-400" />{selectedApp.location}
                       </div>
                     )}
                     <div className="pt-2 border-t border-gray-100 text-xs text-gray-400">
@@ -400,19 +522,15 @@ export default function NotaryApplicationsPage() {
                   {selectedApp.status === 'PENDING' && (
                     <div className="flex flex-col gap-3">
                       <button
-                        onClick={() => handleApprove(selectedApp.id)}
-                        disabled={actionLoading === selectedApp.id}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                        onClick={() => setModal({ type: 'approve', app: selectedApp })}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors"
                       >
-                        {actionLoading === selectedApp.id
-                          ? <Loader2 className="h-4 w-4 animate-spin" />
-                          : <CheckCircle2 className="h-4 w-4" />}
-                        Approve Application
+                        <CheckCircle2 className="h-4 w-4" />
+                        Approve & Activate
                       </button>
                       <button
-                        onClick={() => handleReject(selectedApp.id)}
-                        disabled={actionLoading === selectedApp.id}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                        onClick={() => setModal({ type: 'reject', app: selectedApp })}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors"
                       >
                         <XCircle className="h-4 w-4" />
                         Reject Application
@@ -421,16 +539,18 @@ export default function NotaryApplicationsPage() {
                   )}
 
                   {selectedApp.status === 'APPROVED' && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
                       <CheckCircle2 className="h-6 w-6 text-green-600 mx-auto mb-1" />
                       <p className="text-sm font-semibold text-green-800">Application Approved</p>
+                      <p className="text-xs text-green-600 mt-1">Notary has been notified via email</p>
                     </div>
                   )}
 
                   {selectedApp.status === 'REJECTED' && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
                       <XCircle className="h-6 w-6 text-red-600 mx-auto mb-1" />
                       <p className="text-sm font-semibold text-red-800">Application Rejected</p>
+                      <p className="text-xs text-red-600 mt-1">Applicant has been notified via email</p>
                     </div>
                   )}
                 </div>

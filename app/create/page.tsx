@@ -266,6 +266,7 @@ function CreateDocumentContent() {
       formData: { ...formData },
       documentTitle: getDocumentTitle(selectedTemplate, formData),
       shortDescription: getShortDescription(selectedTemplate, formData),
+      notaryId: selectedAdvocate?.id,
     }
   }
 

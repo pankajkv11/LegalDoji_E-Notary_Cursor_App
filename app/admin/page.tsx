@@ -11,6 +11,77 @@ import {
 } from 'lucide-react'
 import { getToken } from '@/lib/auth'
 
+// ── Approve Modal ─────────────────────────────────────────────────────────────
+function ApproveModal({ app, loading, onConfirm, onCancel }: {
+  app: PendingApplication; loading: boolean; onConfirm: () => void; onCancel: () => void
+}) {
+  const fullName = [app.firstName, app.middleName, app.lastName].filter(Boolean).join(' ')
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div className="flex items-center justify-center w-14 h-14 bg-green-100 rounded-full mx-auto mb-4">
+          <CheckCircle2 className="h-7 w-7 text-green-600" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 text-center mb-1">Approve Application?</h2>
+        <p className="text-sm text-gray-500 text-center mb-5">
+          You are about to approve <span className="font-semibold text-gray-700">{fullName}</span> as a verified notary.
+        </p>
+        <div className="bg-gray-50 rounded-xl p-4 mb-5 space-y-1 text-sm">
+          <div className="flex justify-between"><span className="text-gray-500">Email</span><span className="font-medium text-gray-800">{app.email}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">Application</span><span className="font-mono text-gray-600">{app.applicationNumber}</span></div>
+          {app.location && <div className="flex justify-between"><span className="text-gray-500">Location</span><span className="font-medium text-gray-800">{app.location}</span></div>}
+        </div>
+        <p className="text-xs text-gray-400 text-center mb-5">Their role will be upgraded to <strong>Notary</strong> and they will receive a confirmation email.</p>
+        <div className="flex gap-3">
+          <button onClick={onCancel} disabled={loading} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl font-semibold text-sm transition-colors disabled:opacity-50">Cancel</button>
+          <button onClick={onConfirm} disabled={loading} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            Approve & Activate
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Reject Modal ──────────────────────────────────────────────────────────────
+function RejectModal({ app, loading, onConfirm, onCancel }: {
+  app: PendingApplication; loading: boolean; onConfirm: (reason: string) => void; onCancel: () => void
+}) {
+  const [reason, setReason] = useState('')
+  const fullName = [app.firstName, app.middleName, app.lastName].filter(Boolean).join(' ')
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div className="flex items-center justify-center w-14 h-14 bg-red-100 rounded-full mx-auto mb-4">
+          <AlertTriangle className="h-7 w-7 text-red-600" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 text-center mb-1">Reject Application?</h2>
+        <p className="text-sm text-gray-500 text-center mb-5">
+          You are rejecting the application from <span className="font-semibold text-gray-700">{fullName}</span>.
+        </p>
+        <div className="mb-5">
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Reason for Rejection <span className="text-red-500">*</span></label>
+          <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3}
+            placeholder="e.g. Incomplete documents, Invalid Bar Council number…"
+            className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none" />
+          <p className="text-xs text-gray-400 mt-1">This reason will be emailed to the applicant.</p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onCancel} disabled={loading} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl font-semibold text-sm transition-colors disabled:opacity-50">Cancel</button>
+          <button onClick={() => reason.trim() && onConfirm(reason.trim())} disabled={loading || !reason.trim()}
+            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+            Reject Application
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1/graphql'
 
 async function gql(query: string, variables: Record<string, unknown> = {}) {
@@ -65,6 +136,7 @@ export default function AdminPage() {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loadingStats, setLoadingStats] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [modal, setModal] = useState<{ type: 'approve' | 'reject'; app: PendingApplication } | null>(null)
 
   const fetchDashboardData = async () => {
     setLoadingStats(true)
@@ -93,33 +165,34 @@ export default function AdminPage() {
 
   useEffect(() => { fetchDashboardData() }, [])
 
-  const handleApproveApplication = async (id: string) => {
-    if (!confirm('Approve this notary application?')) return
-    setActionLoading(id)
+  const confirmApprove = async () => {
+    if (!modal) return
+    setActionLoading(modal.app.id)
     try {
       const json = await gql(
         `mutation Approve($id: String!) { approveNotaryApplication(applicationId: $id) { id status } }`,
-        { id }
+        { id: modal.app.id }
       )
       if (json.errors?.length) { alert(json.errors[0].message); return }
-      setPendingApplications(prev => prev.filter(a => a.id !== id))
+      setPendingApplications(prev => prev.filter(a => a.id !== modal.app.id))
       if (stats) setStats({ ...stats, pendingApplications: stats.pendingApplications - 1 })
+      setModal(null)
     } catch { alert('Network error. Please try again.') }
     finally { setActionLoading(null) }
   }
 
-  const handleRejectApplication = async (id: string) => {
-    const reason = prompt('Reason for rejection (sent to applicant):')
-    if (!reason) return
-    setActionLoading(id)
+  const confirmReject = async (reason: string) => {
+    if (!modal) return
+    setActionLoading(modal.app.id)
     try {
       const json = await gql(
         `mutation Reject($id: String!, $reason: String) { rejectNotaryApplication(applicationId: $id, reason: $reason) { id status } }`,
-        { id, reason }
+        { id: modal.app.id, reason }
       )
       if (json.errors?.length) { alert(json.errors[0].message); return }
-      setPendingApplications(prev => prev.filter(a => a.id !== id))
+      setPendingApplications(prev => prev.filter(a => a.id !== modal.app.id))
       if (stats) setStats({ ...stats, pendingApplications: stats.pendingApplications - 1 })
+      setModal(null)
     } catch { alert('Network error. Please try again.') }
     finally { setActionLoading(null) }
   }
@@ -160,6 +233,14 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Modals */}
+      {modal?.type === 'approve' && (
+        <ApproveModal app={modal.app} loading={actionLoading === modal.app.id} onConfirm={confirmApprove} onCancel={() => setModal(null)} />
+      )}
+      {modal?.type === 'reject' && (
+        <RejectModal app={modal.app} loading={actionLoading === modal.app.id} onConfirm={confirmReject} onCancel={() => setModal(null)} />
+      )}
+
       {/* Admin Header */}
       <div className="bg-gradient-to-br from-gray-800 via-gray-900 to-black text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -384,7 +465,7 @@ export default function AdminPage() {
                       View Full Profile
                     </Link>
                     <button
-                      onClick={() => handleRejectApplication(application.id)}
+                      onClick={() => setModal({ type: 'reject', app: application })}
                       disabled={isActing}
                       className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors shadow-lg disabled:opacity-50"
                     >
@@ -392,7 +473,7 @@ export default function AdminPage() {
                       Reject Application
                     </button>
                     <button
-                      onClick={() => handleApproveApplication(application.id)}
+                      onClick={() => setModal({ type: 'approve', app: application })}
                       disabled={isActing}
                       className="flex-1 bg-gray-900 hover:bg-black text-white px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors shadow-lg disabled:opacity-50"
                     >

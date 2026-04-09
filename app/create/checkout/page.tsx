@@ -88,6 +88,7 @@ export default function CreateCheckoutPage() {
                 templateId: draft.templateId,
                 title: draft.documentTitle,
                 formData: draft.formData,
+                notaryId: draft.notaryId ?? null,
               },
             },
           }),
