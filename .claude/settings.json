@@ -5,7 +5,12 @@
       "Bash(export PATH=\"/opt/homebrew/opt/postgresql@16/bin:$PATH\")",
       "Bash(.venv/bin/python3:*)",
       "Bash(python -m alembic current)",
-      "Bash(source .venv/bin/activate)"
+      "Bash(source .venv/bin/activate)",
+      "Read(//Applications/**)",
+      "Bash(/opt/homebrew/opt/postgresql@16/bin/psql -U vishalsingh -d enotary -c \"SELECT id, status, total_amount, created_at FROM orders WHERE deleted_at IS NULL ORDER BY created_at DESC;\")",
+      "Bash(/opt/homebrew/opt/postgresql@16/bin/psql -U vishalsingh -d enotary -c \"UPDATE orders SET deleted_at = NOW\\(\\) WHERE id IN \\('59ac8e62-b257-4f57-a275-16bbb7a48107', '5fba0aef-dd8f-47bf-9e8c-012ba9b315cb'\\);\")",
+      "Bash(/opt/homebrew/opt/postgresql@16/bin/psql -U vishalsingh -d enotary -c \"SELECT o.id, o.status, o.total_amount, o.document_id, d.title FROM orders o LEFT JOIN documents d ON d.id = o.document_id WHERE o.deleted_at IS NULL ORDER BY o.created_at DESC;\")",
+      "Bash(/opt/homebrew/opt/postgresql@16/bin/psql -U vishalsingh -d enotary -c \"UPDATE orders SET deleted_at = NOW\\(\\) WHERE id = '6496aa2a-9021-4ba5-a814-b4031fb2ce08';\")"
     ]
   }
 }

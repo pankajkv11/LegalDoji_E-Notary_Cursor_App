@@ -72,6 +72,49 @@ const categoryColor = (cat: string) => {
 const categoryLabel = (cat: string) =>
   cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 
+function DeleteModal({ doc, onConfirm, onCancel, loading }: {
+  doc: AdminDoc
+  onConfirm: () => void
+  onCancel: () => void
+  loading: boolean
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="bg-red-100 p-2.5 rounded-full">
+            <Trash2 className="h-5 w-5 text-red-600" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900">Delete Document</h2>
+        </div>
+        <p className="text-gray-600 text-sm mb-2">Are you sure you want to delete this document?</p>
+        <div className="bg-gray-50 rounded-lg px-4 py-3 mb-5">
+          <p className="font-semibold text-gray-900 text-sm">{doc.title}</p>
+          <p className="text-xs text-gray-400 font-mono mt-0.5">{doc.id}</p>
+        </div>
+        <p className="text-xs text-red-600 mb-5">This action cannot be undone.</p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            {loading ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function DocumentManagementPage() {
   const [docs, setDocs] = useState<AdminDoc[]>([])
   const [loading, setLoading] = useState(true)
@@ -80,6 +123,7 @@ export default function DocumentManagementPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedDoc, setSelectedDoc] = useState<AdminDoc | null>(null)
+  const [deleteModal, setDeleteModal] = useState<AdminDoc | null>(null)
 
   const fetchDocs = async () => {
     setLoading(true)
@@ -113,14 +157,26 @@ export default function DocumentManagementPage() {
     return () => clearTimeout(t)
   }, [search])
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this document?')) return
+  const handleDeleteConfirm = async () => {
+    if (!deleteModal) return
+    const id = deleteModal.id
     setActionLoading(id)
     try {
-      // Note: adminDeleteDocument mutation can be added to backend when needed
-      // For now just remove from local state after confirmation
+      const json = await gql(
+        `mutation AdminDeleteDoc($id: String!) {
+          adminDeleteDocument(documentId: $id)
+        }`,
+        { id }
+      )
+      if (json.errors?.length) {
+        setError(json.errors[0].message ?? 'Failed to delete document')
+        return
+      }
       setDocs(prev => prev.filter(d => d.id !== id))
       if (selectedDoc?.id === id) setSelectedDoc(null)
+      setDeleteModal(null)
+    } catch {
+      setError('Network error. Failed to delete document.')
     } finally {
       setActionLoading(null)
     }
@@ -138,6 +194,14 @@ export default function DocumentManagementPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {deleteModal && (
+        <DeleteModal
+          doc={deleteModal}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeleteModal(null)}
+          loading={actionLoading === deleteModal.id}
+        />
+      )}
       {/* Header */}
       <div className="bg-gradient-to-br from-gray-800 via-gray-900 to-black text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -301,7 +365,7 @@ export default function DocumentManagementPage() {
                             {doc.pdfUrl && (
                               <a href={doc.pdfUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded hover:bg-gray-100 text-gray-600 transition-colors" title="Download PDF"><Download className="h-4 w-4" /></a>
                             )}
-                            <button onClick={() => handleDelete(doc.id)} disabled={isActing} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50">
+                            <button onClick={() => setDeleteModal(doc)} disabled={isActing} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50">
                               {isActing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                             </button>
                           </div>
@@ -401,7 +465,7 @@ export default function DocumentManagementPage() {
                   </button>
                 )}
                 <button
-                  onClick={() => handleDelete(selectedDoc.id)}
+                  onClick={() => setDeleteModal(selectedDoc)}
                   disabled={actionLoading === selectedDoc.id}
                   className="w-full bg-red-50 hover:bg-red-100 text-red-700 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 border border-red-200 transition-colors disabled:opacity-50"
                 >

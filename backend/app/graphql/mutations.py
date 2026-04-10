@@ -1146,3 +1146,26 @@ class Mutation:
         user.kyc_status = KycStatus.SUBMITTED
         await ctx.session.flush()
         return KycResultType(success=True, kyc_status=user.kyc_status)
+
+    @strawberry.mutation
+    async def admin_delete_document(
+        self,
+        info: strawberry.types.Info,
+        document_id: str,
+    ) -> bool:
+        ctx: Context = info.context
+        admin = ctx.require_user()
+        if admin.role.value != "ADMIN":
+            raise PermissionError("Admin only")
+        from app.models.document import Document
+        from sqlalchemy import select as sa_select
+        from datetime import datetime, timezone
+        r = await ctx.session.execute(
+            sa_select(Document).where(Document.id == document_id, Document.deleted_at.is_(None))
+        )
+        doc = r.scalar_one_or_none()
+        if not doc:
+            raise ValueError("Document not found")
+        doc.deleted_at = datetime.now(timezone.utc)
+        await ctx.session.flush()
+        return True
